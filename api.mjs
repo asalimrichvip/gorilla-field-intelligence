@@ -41,3 +41,15 @@ export async function loadSheets(api,previous){
   }
   return {sheets,ignored,warnings,schemaChanges,source:'Google Drive',refreshed:new Date().toISOString()};
 }
+export function prepareBundle(bundle,previous){
+  const sheets={},ignored={},warnings=[...(bundle.warnings||[])],schemaChanges=[];
+  for(const [name,response] of Object.entries(bundle.sheets||{})){
+    if(!response.ok){if(name==='All')throw new ApiError(response.error||'All unavailable');warnings.push(`${name}: ${response.error}`);continue;}
+    const sheet=prepareSheet(response);sheets[name]=sheet;ignored[name]=sheet.ignored;
+    warnings.push(...sheet.warnings.map(x=>`${name}: ${x}`));
+    const old=previous?.sheets?.[name]?.columns;
+    if(old){sheet.columns.filter(c=>!old.includes(c)).forEach(column=>schemaChanges.push({sheet:name,column,type:'added'}));old.filter(c=>!sheet.columns.includes(c)).forEach(column=>schemaChanges.push({sheet:name,column,type:'removed'}));}
+  }
+  if(!sheets.All)throw new ApiError('All unavailable');
+  return {sheets,ignored,warnings,schemaChanges,source:'Google Drive',refreshed:new Date().toISOString(),sync:bundle.sync};
+}
