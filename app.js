@@ -1,7 +1,7 @@
-import {renderHero,bindHero,heroEditor,slideEditor,readHeroSlides,safeImage} from './hero.mjs?v=151';
-import {supportingRows,supportedFilters,filterSupporting,notificationKeys,attachPasswordEyes,unlockAlertAudio,playAlert} from './experience.mjs?v=151';
+import {renderHero,bindHero,heroEditor,slideEditor,readHeroSlides,safeImage} from './hero.mjs?v=152';
+import {supportingRows,supportedFilters,filterSupporting,notificationKeys,attachPasswordEyes,unlockAlertAudio,playAlert} from './experience.mjs?v=152';
 import {API_URL} from './config.mjs';
-import {createApi,loadSheets,prepareBundle} from './api.mjs?v=151';
+import {createApi,loadSheets,prepareBundle} from './api.mjs?v=152';
 import {xlsxBytes,csvBytes} from './export.mjs';
 const api=createApi(API_URL);
 import {SKU,BRANDS,POSM,num,sum,avg,unique,yes,normalize,latest,filterRows,group,kpis,health,presenceReport,visitStamp,cycleInfo,cyclePeriods} from './analytics.mjs';
@@ -105,9 +105,8 @@ function loginScreen(message=''){
    <div class="login-vignette" aria-hidden="true"></div>
    <section class="login-center-wrap">
      <form id="login-form" class="login-center-card" novalidate>
-       <div class="login-center-brand">
-         <img src="./gorilla-lion.jpg" alt="Gorilla">
-         <div class="login-center-wordmark"><b>GORILLA</b><small>FIELD INTELLIGENCE</small></div>
+       <div class="login-center-brand login-logo-shine">
+         <img src="./gorilla-logo.png" alt="Gorilla Energy Drink">
        </div>
        <div class="login-center-slogan">POWER YOUR<br><span>FIELD INSTINCT</span></div>
        <p class="login-center-sub">${T('Secure field intelligence for presence, execution, opportunity and TDM performance.','ذكاء ميداني آمن لمتابعة التواجد والتنفيذ والفرص وأداء الـ TDMs.')}</p>
