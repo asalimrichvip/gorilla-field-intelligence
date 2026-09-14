@@ -1,0 +1,1 @@
+self.addEventListener('notificationclick',event=>{event.notification.close();event.waitUntil(clients.matchAll({type:'window',includeUncontrolled:true}).then(windows=>{const target=windows.find(w=>w.url.startsWith(self.registration.scope));if(target){target.postMessage({type:'open-notifications'});return target.focus()}return clients.openWindow(self.registration.scope)}))});
