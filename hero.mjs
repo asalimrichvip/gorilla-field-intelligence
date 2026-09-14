@@ -1,0 +1,34 @@
+const escape=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+export const defaults=[
+ {image:'./hero-ultimate.jpg',title:'POWER YOUR FIELD INSTINCT',subtitle:'Gorilla field intelligence',tone:'ultimate',page:'presence',caption:false},
+ {image:'',title:'MANGO COCONUT',subtitle:'Discover availability, SKU distribution and your next opportunity.',tone:'mango',page:'availability',caption:true},
+ {image:'',title:'WATERMELON MELON',subtitle:'Turn every visit into stronger execution.',tone:'watermelon',page:'execution',caption:true}
+];
+export const heroSlides=hero=>Array.isArray(hero?.slides)&&hero.slides.length?hero.slides:defaults;
+export function safeImage(value){try{if(value.startsWith('./'))return value;const url=new URL(value);return url.protocol==='https:'?url.href:'';}catch{return '';}}
+export function renderHero(hero={},ar=false){
+ if(hero.enabled===false)return '';const slides=heroSlides(hero);
+ return `<section class="gorilla-carousel" aria-label="${ar?'عروض جوريلا':'Gorilla highlights'}" aria-roledescription="carousel" data-seconds="${Math.max(3,Math.min(20,Number(hero.autoplaySeconds)||6))}" data-fit="${hero.fit==='contain'?'contain':'cover'}">
+ ${slides.map((s,i)=>`<article class="gorilla-slide tone-${['ultimate','mango','watermelon'].includes(s.tone)?s.tone:'ultimate'}" ${i?'hidden':''} data-slide="${i}" aria-label="${i+1} / ${slides.length}">
+ ${safeImage(s.image||'')?`<img class="hero-picture" src="${escape(safeImage(s.image))}" alt="${escape(s.title||'Gorilla')}" ${i?'loading="lazy"':'fetchpriority="high"'}>`:`<div class="hero-graphic" aria-hidden="true"><div class="graphic-can"><span>GORILLA</span><b>G</b><small>ENERGY DRINK</small></div><div class="graphic-ring"></div></div>`}
+ ${s.caption!==false?`<div class="carousel-copy"><small>GORILLA · ENERGY DRINK</small><h2>${escape(s.title)}</h2><p>${escape(s.subtitle)}</p><button data-tab="${escape(s.page||'presence')}">${ar?'استكشف الآن':'EXPLORE NOW'} →</button></div>`:''}</article>`).join('')}
+ <div class="carousel-controls"><button class="hero-prev" aria-label="${ar?'الشريحة السابقة':'Previous slide'}">‹</button><div class="hero-dots">${slides.map((_,i)=>`<button data-hero-dot="${i}" aria-label="${ar?'الشريحة':'Slide'} ${i+1}" aria-current="${i===0?'true':'false'}"></button>`).join('')}</div><button class="hero-next" aria-label="${ar?'الشريحة التالية':'Next slide'}">›</button><button class="hero-pause" aria-label="${ar?'إيقاف الحركة':'Pause slideshow'}">Ⅱ</button></div></section>`;
+}
+export function bindHero(root,ar=false){
+ if(!root)return()=>{};let index=0,paused=matchMedia('(prefers-reduced-motion: reduce)').matches,hover=false;
+ const slides=[...root.querySelectorAll('[data-slide]')],dots=[...root.querySelectorAll('[data-hero-dot]')],pause=root.querySelector('.hero-pause');
+ const show=i=>{index=(i+slides.length)%slides.length;slides.forEach((s,n)=>s.hidden=n!==index);dots.forEach((d,n)=>d.setAttribute('aria-current',String(n===index)));};
+ const updatePause=()=>{pause.textContent=paused?'▶':'Ⅱ';pause.setAttribute('aria-label',ar?(paused?'تشغيل الحركة':'إيقاف الحركة'):(paused?'Play slideshow':'Pause slideshow'));};
+ dots.forEach((d,i)=>d.onclick=()=>show(i));root.querySelector('.hero-prev').onclick=()=>show(index-1);root.querySelector('.hero-next').onclick=()=>show(index+1);
+ pause.onclick=()=>{paused=!paused;updatePause();};updatePause();
+ root.onmouseenter=()=>hover=true;root.onmouseleave=()=>hover=false;
+ root.onkeydown=e=>{if(e.key==='ArrowRight'){show(index+1);e.preventDefault();}if(e.key==='ArrowLeft'){show(index-1);e.preventDefault();}};
+ const timer=setInterval(()=>{if(!paused&&!hover&&document.visibilityState==='visible'&&!root.contains(document.activeElement))show(index+1);},Number(root.dataset.seconds)*1000);
+ root.querySelectorAll('.hero-picture').forEach(img=>img.onerror=()=>{img.hidden=true;const notice=document.createElement('p');notice.className='hero-image-error';notice.textContent=ar?'تعذر تحميل صورة الهيرو. راجع رابط الصورة في الإعدادات.':'Hero image unavailable. Check its URL in Settings.';img.after(notice);});
+ return()=>clearInterval(timer);
+}
+export function heroEditor(hero={},ar=false){
+ return `<div class="hero-size-guide">${ar?'المقاس المقترح: 1920 × 640 بكسل، نسبة 3:1. JPG أو WebP، ويفضل أقل من 500KB. اترك النصوص والعناصر المهمة داخل منتصف 80% من الصورة. اختر «الصورة كاملة» لمنع القص.':'Recommended: 1920 × 640 px (3:1), JPG or WebP, preferably under 500KB. Keep important content in the central 80%. Choose Entire image to prevent cropping.'}</div><label class="stack-setting">${ar?'طريقة العرض':'Image fit'}<select id="hero-fit"><option value="cover" ${hero.fit!=='contain'?'selected':''}>${ar?'ملء المساحة (قد يقص الأطراف)':'Fill area (may crop edges)'}</option><option value="contain" ${hero.fit==='contain'?'selected':''}>${ar?'الصورة كاملة (بدون قص)':'Entire image (no cropping)'}</option></select></label><div id="hero-slide-editor">${heroSlides(hero).map((s,i)=>slideEditor(s,i,ar)).join('')}</div><button id="hero-add-slide" type="button">+ ${ar?'إضافة شريحة':'Add slide'}</button>`;
+}
+export function slideEditor(s={},i=0,ar=false){return `<fieldset class="hero-edit-slide"><legend>${ar?'شريحة':'Slide'} ${i+1}</legend><label>${ar?'رابط الصورة المباشر HTTPS (اتركه فارغًا لتصميم جوريلا)':'Direct HTTPS image URL (blank for Gorilla design)'}<input data-hero-image value="${escape(s.image||'')}" placeholder="https://…/banner.jpg"></label><label>${ar?'العنوان':'Title'}<input data-hero-title value="${escape(s.title||'')}" maxlength="120"></label><label>${ar?'الوصف':'Subtitle'}<input data-hero-subtitle value="${escape(s.subtitle||'')}" maxlength="240"></label><label><input type="checkbox" data-hero-caption ${s.caption!==false?'checked':''}> ${ar?'إظهار النص والزر فوق الصورة':'Show text and button over image'}</label><label>${ar?'اللون':'Color'}<select data-hero-tone>${['ultimate','mango','watermelon'].map(t=>`<option ${s.tone===t?'selected':''}>${t}</option>`).join('')}</select></label><label>${ar?'الصفحة عند الضغط':'Button destination'}<select data-hero-page>${['presence','availability','execution','market','geo','reports'].map(t=>`<option ${s.page===t?'selected':''}>${t}</option>`).join('')}</select></label><button type="button" data-remove-slide>${ar?'حذف الشريحة':'Remove slide'}</button></fieldset>`;}
+export function readHeroSlides(root){return [...root.querySelectorAll('.hero-edit-slide')].map(el=>({image:el.querySelector('[data-hero-image]').value.trim(),title:el.querySelector('[data-hero-title]').value.trim(),subtitle:el.querySelector('[data-hero-subtitle]').value.trim(),caption:el.querySelector('[data-hero-caption]').checked,tone:el.querySelector('[data-hero-tone]').value,page:el.querySelector('[data-hero-page]').value}));}

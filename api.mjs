@@ -19,6 +19,7 @@ export function createApi(url, storage=globalThis.sessionStorage, fetcher=global
   };
 }
 export function prepareSheet(result) {
+  if(Array.isArray(result.values)&&Array.isArray(result.columns))result={...result,rows:result.values.map(values=>Object.fromEntries(result.columns.map((c,i)=>[c,values[i]??''])))};
   if(!Array.isArray(result.rows))throw new ApiError('Invalid sheet response');
   const columns=[...new Set([...(result.columns||[]),...result.rows.flatMap(Object.keys)])];
   const ignored=columns.filter(c=>c.includes('#REF!')||result.rows.some(r=>typeof r[c]==='string'&&r[c].includes('#REF!')));
