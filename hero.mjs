@@ -15,15 +15,15 @@ export function renderHero(hero={},ar=false){
  <div class="carousel-controls"><button class="hero-prev" aria-label="${ar?'الشريحة السابقة':'Previous slide'}">‹</button><div class="hero-dots">${slides.map((_,i)=>`<button data-hero-dot="${i}" aria-label="${ar?'الشريحة':'Slide'} ${i+1}" aria-current="${i===0?'true':'false'}"></button>`).join('')}</div><button class="hero-next" aria-label="${ar?'الشريحة التالية':'Next slide'}">›</button><button class="hero-pause" aria-label="${ar?'إيقاف الحركة':'Pause slideshow'}">Ⅱ</button></div></section>`;
 }
 export function bindHero(root,ar=false){
- if(!root)return()=>{};let index=0,paused=matchMedia('(prefers-reduced-motion: reduce)').matches,hover=false;
+ if(!root)return()=>{};let index=0,paused=matchMedia('(prefers-reduced-motion: reduce)').matches;
  const slides=[...root.querySelectorAll('[data-slide]')],dots=[...root.querySelectorAll('[data-hero-dot]')],pause=root.querySelector('.hero-pause');
  const show=i=>{index=(i+slides.length)%slides.length;slides.forEach((s,n)=>s.hidden=n!==index);dots.forEach((d,n)=>d.setAttribute('aria-current',String(n===index)));};
  const updatePause=()=>{pause.textContent=paused?'▶':'Ⅱ';pause.setAttribute('aria-label',ar?(paused?'تشغيل الحركة':'إيقاف الحركة'):(paused?'Play slideshow':'Pause slideshow'));};
  dots.forEach((d,i)=>d.onclick=()=>show(i));root.querySelector('.hero-prev').onclick=()=>show(index-1);root.querySelector('.hero-next').onclick=()=>show(index+1);
  pause.onclick=()=>{paused=!paused;updatePause();};updatePause();
- root.onmouseenter=()=>hover=true;root.onmouseleave=()=>hover=false;
+
  root.onkeydown=e=>{if(e.key==='ArrowRight'){show(index+1);e.preventDefault();}if(e.key==='ArrowLeft'){show(index-1);e.preventDefault();}};
- const timer=setInterval(()=>{if(!paused&&!hover&&document.visibilityState==='visible'&&!root.contains(document.activeElement))show(index+1);},Number(root.dataset.seconds)*1000);
+ const timer=setInterval(()=>{if(!paused&&document.visibilityState==='visible')show(index+1);},Number(root.dataset.seconds)*1000);
  root.querySelectorAll('.hero-picture').forEach(img=>img.onerror=()=>{img.hidden=true;const notice=document.createElement('p');notice.className='hero-image-error';notice.textContent=ar?'تعذر تحميل صورة الهيرو. راجع رابط الصورة في الإعدادات.':'Hero image unavailable. Check its URL in Settings.';img.after(notice);});
  return()=>clearInterval(timer);
 }
