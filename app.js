@@ -1,7 +1,7 @@
-import {renderHero,bindHero,heroEditor,slideEditor,readHeroSlides,safeImage} from './hero.mjs?v=150';
-import {supportingRows,supportedFilters,filterSupporting,notificationKeys,attachPasswordEyes,unlockAlertAudio,playAlert} from './experience.mjs?v=150';
+import {renderHero,bindHero,heroEditor,slideEditor,readHeroSlides,safeImage} from './hero.mjs?v=151';
+import {supportingRows,supportedFilters,filterSupporting,notificationKeys,attachPasswordEyes,unlockAlertAudio,playAlert} from './experience.mjs?v=151';
 import {API_URL} from './config.mjs';
-import {createApi,loadSheets,prepareBundle} from './api.mjs?v=150';
+import {createApi,loadSheets,prepareBundle} from './api.mjs?v=151';
 import {xlsxBytes,csvBytes} from './export.mjs';
 const api=createApi(API_URL);
 import {SKU,BRANDS,POSM,num,sum,avg,unique,yes,normalize,latest,filterRows,group,kpis,health,presenceReport,visitStamp,cycleInfo,cyclePeriods} from './analytics.mjs';
@@ -278,7 +278,7 @@ function updateAlerts(){
 }
 let lastSoundKeys=new Set();
 document.addEventListener('pointerdown',unlockAlertAudio,{once:true});
-setInterval(()=>{if(document.visibilityState==='visible'&&state.me)void checkFreshness(false);},60000);
+setInterval(()=>{if(state.me)void checkFreshness(false);},60000);
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&state.me)void checkFreshness(false);});
 async function saveShared(settings){try{state.appSettings=(await api.call('saveSettings',{settings})).settings;toast(T('Settings saved','تم حفظ الإعدادات'));return true}catch(e){toast(e.message);return false}}
 async function saveAppearance(){
@@ -372,3 +372,4 @@ if(api.hasSession())refresh(true);else loginScreen();
 
 
 navigator.serviceWorker?.addEventListener('message',event=>{if(event.data?.type==='open-notifications'&&state.me){state.tab='notifications';state.filters={};render();}});
+
