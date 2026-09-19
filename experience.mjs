@@ -14,8 +14,7 @@ export function filterSupporting(sheet,filters,omit){const allowed=supportedFilt
 export function notificationKeys(issues,rows,sheets){
  const byRow=new Map(rows.map(r=>[r._row,r]));
  const keys=issues.filter(i=>i.severity!=='info').map(i=>{const r=byRow.get(i.row)||{};return JSON.stringify(['issue',i.kind,i.column||'',r._id||'',r['Started At']||r.Date||'',r._sourceFile||'']);});
- for(const r of sheets.Missing?.rows||[])keys.push(JSON.stringify(['missing',r['Adhoc Serial']||r['Client Code']||r.Client,r._sourceDate||r.Date||'']));
- for(const [name,sheet] of Object.entries(sheets))for(const col of sheet.columns)keys.push(JSON.stringify(['column',name,col]));
+ for(const [name,sheet] of Object.entries(sheets))if(!['Missing','NewAdd'].includes(name))for(const col of sheet.columns)keys.push(JSON.stringify(['column',name,col]));
  return [...new Set(keys)];
 }
 export function attachPasswordEyes(root,ar=false){

@@ -28,7 +28,7 @@ export function prepareSheet(result) {
 }
 export async function loadSheets(api,previous){
   const sheets={},ignored={},warnings=[],schemaChanges=[];
-  for(const name of ['All','NewAdd','Missing','Start-End']){
+  for(const name of ['All','Start-End']){
     try{
       const response=await api.call('data',{sheet:name});
       const sheet=prepareSheet(response);sheets[name]=sheet;ignored[name]=sheet.ignored;
@@ -45,6 +45,7 @@ export async function loadSheets(api,previous){
 export function prepareBundle(bundle,previous){
   const sheets={},ignored={},warnings=[...(bundle.warnings||[])],schemaChanges=[];
   for(const [name,response] of Object.entries(bundle.sheets||{})){
+    if(['NewAdd','Missing'].includes(name))continue;
     if(!response.ok){if(name==='All')throw new ApiError(response.error||'All unavailable');warnings.push(`${name}: ${response.error}`);continue;}
     const sheet=prepareSheet(response);sheets[name]=sheet;ignored[name]=sheet.ignored;
     warnings.push(...sheet.warnings.map(x=>`${name}: ${x}`));

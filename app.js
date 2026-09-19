@@ -1,12 +1,15 @@
-import {renderHero,bindHero,heroEditor,slideEditor,readHeroSlides,safeImage} from './hero.mjs?v=152';
-import {supportingRows,supportedFilters,filterSupporting,notificationKeys,attachPasswordEyes,unlockAlertAudio,playAlert} from './experience.mjs?v=152';
+import {renderHero,bindHero,heroEditor,slideEditor,readHeroSlides,safeImage} from './hero.mjs?v=1500';
+import {supportingRows,supportedFilters,filterSupporting,notificationKeys,attachPasswordEyes,unlockAlertAudio,playAlert} from './experience.mjs?v=1500';
 import {API_URL} from './config.mjs';
-import {createApi,loadSheets,prepareBundle} from './api.mjs?v=152';
+import {createApi,loadSheets,prepareBundle} from './api.mjs?v=1500';
 import {xlsxBytes,csvBytes} from './export.mjs';
 const api=createApi(API_URL);
 import {SKU,BRANDS,POSM,num,sum,avg,unique,yes,normalize,latest,filterRows,group,kpis,health,presenceReport,visitStamp,cycleInfo,cyclePeriods} from './analytics.mjs';
 import {STATUS_FIELD,GORILLA_QUESTION,JUHAYNA_QUESTION,flavorColor,statusText,answerText,displayValue,formatDuration,parseDuration,googleMapsUrl,isLocationField,formatTimestamp} from './presentation.mjs';
-import {presenceView,modeRows,enrichedPresenceRows,inlineHistory,PRESENCE_MODES} from './presence-ui.mjs';
+import {presenceView,modeRows,enrichedPresenceRows,inlineHistory,PRESENCE_MODES} from './presence-ui.mjs?v=1500';
+import {trendChart,comparisonView} from './trends.mjs?v=1500';
+import {metricIcons,quickIllustration} from './cards.mjs?v=1500';
+let comparisonMode='month';
 const $=s=>document.querySelector(s), esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const read=(k,d)=>{try{return JSON.parse(localStorage.getItem(k))??d}catch{return d}};
 const state={lang:read('gorilla-lang','en'),theme:read('gorilla-theme','ultimate'),tab:'dashboard',filters:{},page:0,columns:read('gorilla-columns',null),settings:read('gorilla-settings',{short:2,share:15,availability:0,perfectAvailability:6,perfectShare:20,tabs:{}}),issue:null,sheet:'All',busy:false,photoCategory:'',presenceMode:'present',selectedStore:null,me:null,users:[],appSettings:null,filterSettingsPage:'dashboard'};
@@ -18,7 +21,8 @@ const icons={dashboard:'◫',presence:'◉',performance:'↗',availability:'▥'
 const issueLabels={presenceConflict:['Gorilla answer conflicts with SKU evidence','تعارض إجابة جوريلا مع الأصناف'],missingId:['Missing Client Code','كود محل مفقود'],invalidDate:['Invalid or missing date','تاريخ غير صالح أو مفقود'],futureDate:['Future visit date','زيارة بتاريخ مستقبلي'],invalidGeo:['Invalid or missing coordinates','إحداثيات غير صالحة أو مفقودة'],invalidDuration:['Invalid or missing duration','مدة غير صالحة أو مفقودة'],shortVisit:['Very short visits','زيارات قصيرة جدًا'],noAvailability:['Low / zero availability','توافر منخفض أو صفر'],lowShare:['Low share of shelf','حصة رف منخفضة'],strongOpportunity:['Strong store without Gorilla','محل قوي بدون جوريلا'],duplicate:['Duplicate visit timestamp','زيارة مكررة بنفس التوقيت'],posmMismatch:['POSM summary differs from detail','ملخص الدعاية مختلف عن التفاصيل'],availabilityMismatch:['Availability differs from SKU detail','التوافر مختلف عن تفاصيل الأصناف'],formulaError:['Other Excel formula errors','أخطاء معادلات أخرى'],missingColumn:['Required column missing','عمود مطلوب مفقود']};
 const label=k=>labels[k]?T(...labels[k]):k;
 labels.notifications=['Notification Center','مركز الإشعارات'];icons.notifications='♧';
-labels.newstores=['New Stores','المحلات الجديدة'];icons.newstores='＋';
+labels.presencetrends=['Presence Dashboard','داشبورد التواجد'];icons.presencetrends='↗';
+labels.tdmphotos=['TDM profile photos','صور المندوبين'];icons.tdmphotos='◉';
 const fieldLabel=k=>({'Rep':T('TDM','TDM'),[STATUS_FIELD]:T('Visit status','حالة الزيارة'),'_surveyGorilla':T('Gorilla question','سؤال جوريلا'),'_juhayna':T('Deals in Juhayna','يتعامل في جهينة'),'_presence':T('Gorilla presence','تواجد جوريلا'),'Duration (min)':T('Visit duration','مدة الزيارة'),'Avg minutes':T('Average visit duration','متوسط مدة الزيارة'),'Visit hours':T('Recorded visit time','وقت الزيارات المسجل'),'Total Duration':T('Total duration','إجمالي المدة')}[k])||(state.lang==='en'?k:({'Rep':'TDM','RTM':'المنطقة البيعية','Governorate':'المحافظة','Area Name':'المنطقة','Outlet Type':'نوع المحل','Date':'التاريخ','Client':'المحل','Client Code':'كود العميل','Started At':'بداية الزيارة','Ended At':'نهاية الزيارة','Availability':'التوافر','Duration (min)':'المدة (دقائق)','Gorilla Share of Shelf':'حصة جوريلا من الرف','Visits':'الزيارات','Outlets':'المحلات','Success %':'النجاح %','Avg minutes':'متوسط الدقائق','Presence %':'التواجد %','Visit hours':'ساعات الزيارات','Orders':'الطلبات','Order Cartons':'كراتين الطلب','Visit Hour':'ساعة الزيارة'}[k]||k));
 const duration=minutes=>formatDuration(minutes==null?null:minutes*60);
 const display=(c,v)=>displayValue(c,v,state.lang);
@@ -26,7 +30,7 @@ const currentPresence=()=>presenceReport(rows,state.filters);
 const ilabel=k=>issueLabels[k]?T(...issueLabels[k]):k;
 const fmt=(n,d=0)=>n==null?'—':Number(n).toLocaleString(state.lang==='ar'?'ar-EG':'en-GB',{maximumFractionDigits:d});
 const pct=n=>n==null?'—':fmt(n*100,1)+'%';
-function allowedPage(k){return Boolean(state.me)&&(k==='notifications'||state.me.role==='owner'||(state.me.pages||[]).includes(k));}
+function allowedPage(k){if(k==='tdmphotos')return state.me?.role==='owner';if(k==='presencetrends')return allowedPage('presence');return Boolean(state.me)&&(k==='notifications'||state.me.role==='owner'||(state.me.pages||[]).includes(k));}
 function allowedAction(k){return state.me?.role==='owner'||(state.me?.actions||[]).includes(k)}
 function shortDate(iso){if(!iso)return '';const d=new Date(iso+'T12:00:00Z');return d.toLocaleDateString(state.lang==='ar'?'ar-EG':'en-GB',{day:'2-digit',month:'short'});}
 function addDays(iso,n){if(!iso)return '';const d=new Date(iso+'T12:00:00Z');if(Number.isNaN(d.getTime()))return '';d.setUTCDate(d.getUTCDate()+Number(n||0));return d.toISOString().slice(0,10)}
@@ -42,15 +46,6 @@ function bars(title,items,key,format=fmt){
 }
 const empty=()=>`<p class="empty">${T('No matching data','لا توجد بيانات مطابقة')}</p>`;
 function card(name,value,note,accent=''){return `<section class="metric ${accent}"><span>${name}</span><strong>${value}</strong><small>${note}</small></section>`}
-function missingSnapshot(){
- const sheet=data.sheets.Missing;if(!sheet)return null;
- const supported=new Set(['from','to','_cycle','_week','_date','RTM','Rep']);
- if(Object.entries(state.filters).some(([k,v])=>v&&!supported.has(k)))return null;
- const candidates=sheet.rows.map(r=>({...r,Rep:r.Rep||r['New Repzo User'],_date:String(r._sourceDate||r.Date||'').slice(0,10)}));
- const selected=filterRows(candidates,state.filters),date=selected.map(r=>r._date).filter(Boolean).sort().at(-1);
- if(!date)return null;
- return selected.filter(r=>r._date===date);
-}
 function dashboard(rs){
  const k=kpis(rs),stores=latest(rs),pr=currentPresence(),prev=previousPeriodRows(rs),pk=kpis(prev);
  const delta=(a,b,percent=false)=>{if(!prev.length||a==null||b==null)return '—';const d=(a-b)*(percent?100:1);return `${d>=0?'↑':'↓'} ${fmt(Math.abs(d),1)}${percent?'%':''}`};
@@ -60,25 +55,23 @@ function dashboard(rs){
  const totalAreas=Math.max(1,areas.reduce((a,x)=>a+x[1],0));
  const colors=['#11a8ff','#1669ee','#ffc31b','#ff8b1f','#e56b52'];
  let offset=0;const stops=areas.map((x,i)=>{const a=offset/totalAreas*100;offset+=x[1];const b=offset/totalAreas*100;return `${colors[i%colors.length]} ${a}% ${b}%`}).join(',');
- const missing=missingSnapshot(),missingCount=missing===null?null:unique(missing,'Adhoc Serial');
- const coverage=missingCount===null||!k.stores?null:k.stores/(k.stores+missingCount);
  return `${heroHTML()}
  <div class="mock-kpis">
-  ${mockKpi('▦',T('Total Stores','إجمالي المحلات'),missingCount===null?'—':fmt(k.stores+missingCount),delta(k.stores,pk.stores),'blue')}
+  ${mockKpi('▦',T('Total Stores','إجمالي المحلات'),fmt(k.stores),delta(k.stores,pk.stores),'blue')}
   ${mockKpi('●',T('Visited Stores','المحلات المزارة'),fmt(k.stores),delta(k.stores,pk.stores),'cyan')}
-  ${mockKpi('▥',T('Coverage %','نسبة التغطية'),coverage==null?'—':pct(coverage),T('Visited + latest missing snapshot','المزار + أحدث قائمة مفقود'),'green')}
+  ${mockKpi('▥',T('Gorilla presence','تواجد جوريلا'),pct(k.presence),T('Latest outlet visit','آخر زيارة للمحل'),'green')}
   ${mockKpi('♟',T('Active TDMs','TDMs النشطين'),fmt(unique(rs,'Rep')),delta(unique(rs,'Rep'),unique(prev,'Rep')),'yellow')}
  </div>
  <div class="mock-chart-grid">
-  <section class="mock-panel trend-panel"><div class="mock-panel-head"><h2>${T('Visits Trend','اتجاه الزيارات')}</h2><span>${T('Selected Period','الفترة المختارة')}⌄</span></div><div class="line-chart"><svg viewBox="0 0 100 100" preserveAspectRatio="none"><defs><linearGradient id="areaFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--accent)" stop-opacity=".5"/><stop offset="1" stop-color="var(--accent)" stop-opacity="0"/></linearGradient></defs><polygon points="${dates.length===1?'50,100': '0,100'} ${pts} ${dates.length===1?'50,100':'100,100'}" fill="url(#areaFill)"/>${dates.length===1?`<circle cx="50" cy="20" r="1.8" fill="var(--accent)"/>`:''}<polyline points="${pts}" fill="none" stroke="var(--accent)" stroke-width="1.5" vector-effect="non-scaling-stroke"/></svg><div class="chart-gridlines"></div></div></section>
+  <section class="mock-panel trend-panel"><div class="mock-panel-head"><h2>${T('Visits Trend','اتجاه الزيارات')}</h2><span>${T('Visits / Date','الزيارات / التاريخ')}</span></div>${trendChart(dates,{esc,fmt,T})}</section>
   <section class="mock-panel"><div class="mock-panel-head"><h2>${T('Visits by Area','الزيارات حسب المنطقة')}</h2></div><div class="area-donut-wrap"><div class="area-donut" style="background:conic-gradient(${stops||'#123 0 100%'})"><div><b>${fmt(k.visits)}</b><small>${T('Visits','زيارة')}</small></div></div><div class="area-legend">${areas.map((x,i)=>`<button data-filter="RTM" data-value="${esc(x[0])}"><i style="background:${colors[i%colors.length]}"></i><span>${esc(x[0])}</span><b>${fmt(x[1]/totalAreas*100,0)}%</b></button>`).join('')}</div></div></section>
   <section class="mock-panel"><div class="mock-panel-head"><h2>${T('Top TDMs','أفضل TDMs')}</h2><button data-tab="performance">${T('View All','عرض الكل')}</button></div><div class="tdm-rank">${tdms.map((x,i)=>`<button data-filter="Rep" data-value="${esc(x[0])}"><em>${i+1}</em><span class="avatar-dot">${esc(String(x[0]||'?').slice(0,1).toUpperCase())}</span><strong>${esc(x[0])}</strong><b>${fmt(x[1])}</b></button>`).join('')||empty()}</div></section>
  </div>
  <div class="quick-cards dashboard-quick">${quickCard('geo','pin',T('MAPS','الخرائط'),T('Explore store locations','استكشف مواقع المحلات'),'blue')}${quickCard('photos','camera',T('PHOTO GALLERY','معرض الصور'),T('View store images','استعرض صور المحلات'),'teal')}${quickCard('reports','doc',T('REPORTS','التقارير'),T('Generate insights','أنشئ تقارير ونتائج'),'violet')}${quickCard('market','target',T('ATTENTION REQUIRED','يتطلب الانتباه'),T('Open business signals','افتح إشارات المتابعة'),'gold')}</div>
  <details class="filter-drawer dashboard-filters"><summary><span>⚙ ${T('Advanced filters & Cycle / Week','الفلاتر المتقدمة والسايكل / الأسبوع')}</span><b>${fmt(rs.length)} ${T('visits','زيارة')}</b></summary>${filtersHTML()}</details>
- <section class="presence-quick"><div><strong>${fmt(pr.presentCount)}</strong>${T('Clients with Gorilla in period','عملاء بها جوريلا في الفترة')}</div><div><strong>${fmt(pr.cumulativeCount)}</strong>${T('Cumulative clients','عملاء تراكميون')}</div><div><strong>${duration(k.duration)}</strong>${T('Average visit time','متوسط وقت الزيارة')}</div><button data-tab="presence">${T('View Gorilla stores & history','عرض محلات جوريلا والتاريخ')} ↗</button></section>`;
+ <section class="presence-quick"><div><strong>${fmt(pr.presentCount)}</strong>${T('Clients with Gorilla in period','عملاء بها جوريلا في الفترة')}</div><div><strong>${fmt(pr.cumulativeCount)}</strong>${T('Cumulative clients','عملاء تراكميون')}</div><div><strong>${duration(k.duration)}</strong>${T('Average visit time','متوسط وقت الزيارة')}</div><button data-tab="presence">${T('View Gorilla stores & history','عرض محلات جوريلا والتاريخ')} ↗</button></section>${comparisonView(rs,comparisonMode,{esc,fmt,T,filters:state.filters})}`;
 }
-function mockKpi(icon,title,value,note,tone){return `<section class="mock-kpi ${tone}"><span class="mock-kpi-icon">${icon}</span><div><small>${title}</small><strong>${value}</strong></div><em>${note}</em></section>`}
+function mockKpi(icon,title,value,note,tone){return `<section class="mock-kpi ${tone}"><span class="mock-kpi-icon">${metricIcons[tone]||icon}</span><div><small>${title}</small><strong>${value}</strong></div><em>${note}${/^[↑↓]/.test(note)?`<small>${T('vs previous period','عن الفترة السابقة')}</small>`:''}</em></section>`}
 
 function attentionRow(name,value,tab){return `<button class="attention-row" data-tab="${tab}"><span>${name}</span><b>${fmt(value)}</b><i>›</i></button>`}
 let stopHero=()=>{};
@@ -91,7 +84,7 @@ function previousPeriodRows(){
  return filterRows(rows,{...f,_cycle:'',_week:'',from,to});
 }
 function lostStores(all,filters){const period=filterRows(all,filters),latestPeriod=latest(period),ids=new Set();for(const r of latestPeriod){if(r._presence!==false||!r._id)continue;const prior=all.some(x=>x._id===r._id&&x._presence===true&&visitStamp(x)<visitStamp(r));if(prior)ids.add(r._id)}return [...ids]}
-function navHTML(){const groups=[['OVERVIEW',['dashboard']],['GORILLA',['presence','availability','execution','market']],['FIELD TEAM',['performance','geo']],['STORES',['stores','newstores','photos','all']],['REPORTING & CONTROL',['reports','health','optional']]];let out='';for(const [title,items] of groups){const visible=items.filter(k=>allowedPage(k)&&state.settings.tabs[k]!==false&&(k!=='newstores'||data.sheets.NewAdd));if(!visible.length)continue;out+=`<div class="nav-group"><small>${title}</small>${visible.map(k=>`<button data-tab="${k}" class="nav-item ${state.tab===k?'active':''}"><span>${icons[k]}</span>${label(k)}</button>`).join('')}</div>`}if(state.me?.role==='owner')out+=`<div class="nav-group owner-nav"><small>OWNER</small><button data-tab="settings" class="nav-item ${state.tab==='settings'?'active':''}"><span>${icons.settings}</span>${label('settings')}</button><button data-tab="users" class="nav-item ${state.tab==='users'?'active':''}"><span>${icons.users}</span>${label('users')}</button></div>`;out+=`<div class="nav-group"><button data-tab="notifications" class="nav-item ${state.tab==='notifications'?'active':''}"><span>♧</span>${label('notifications')}</button></div>`;return out}
+function navHTML(){const groups=[['OVERVIEW',['dashboard']],['GORILLA',['presence','presencetrends','availability','execution','market']],['FIELD TEAM',['performance','geo']],['STORES',['stores','photos','all']],['REPORTING & CONTROL',['reports','health','optional']]];let out='';for(const [title,items] of groups){const visible=items.filter(k=>allowedPage(k)&&state.settings.tabs[k]!==false);if(!visible.length)continue;out+=`<div class="nav-group"><small>${title}</small>${visible.map(k=>`<button data-tab="${k}" class="nav-item ${state.tab===k?'active':''}"><span>${icons[k]}</span>${label(k)}</button>`).join('')}</div>`}if(state.me?.role==='owner')out+=`<div class="nav-group owner-nav"><small>OWNER</small><button data-tab="settings" class="nav-item ${state.tab==='settings'?'active':''}"><span>${icons.settings}</span>${label('settings')}</button><button data-tab="users" class="nav-item ${state.tab==='users'?'active':''}"><span>${icons.users}</span>${label('users')}</button></div>`;out+=`<div class="nav-group"><button data-tab="notifications" class="nav-item ${state.tab==='notifications'?'active':''}"><span>♧</span>${label('notifications')}</button></div>`;return out}
 function reportsView(rs){const k=kpis(rs),pr=currentPresence();return `<div class="report-grid">${reportCard('presence',T('Gorilla Presence Report','تقرير تواجد جوريلا'),`${fmt(pr.presentCount)} ${T('present ·','متواجد ·')} ${fmt(pr.repeatedCount)} ${T('repeated absence','غياب متكرر')}`)}${reportCard('performance',T('TDM Performance Report','تقرير أداء TDMs'),`${fmt(unique(rs,'Rep'))} TDMs · ${duration(k.duration)} ${T('avg visit','متوسط زيارة')}`)}${reportCard('availability',T('Availability & SKU Report','تقرير التوافر والأصناف'),`${fmt(k.availability,1)} / 6 ${T('average availability','متوسط التوافر')}`)}${reportCard('market',T('Opportunity & Attention Report','تقرير الفرص والتنبيهات'),`${fmt(pr.repeatedCount+lostStores(rows,state.filters).length)} ${T('priority signals','إشارات أولوية')}`)}${reportCard('all',T('Full Visit Export','تصدير الزيارات الكامل'),`${fmt(rs.length)} ${T('matching visits','زيارة مطابقة')}`)}</div><section class="panel"><h2>${T('Reporting rules','قواعد التقارير')}</h2><p>${T('Every report respects your RTM access plus Cycle, Week and all active filters. Export permission is checked by the server.','كل تقرير يحترم صلاحية RTM والسايكل والأسبوع وكل الفلاتر المفعلة. صلاحية التصدير يتم التحقق منها على السيرفر.')}</p></section>`}
 function reportCard(tab,title,note){return `<section class="report-card"><span>${icons[tab]||'▤'}</span><h2>${title}</h2><p>${note}</p><div><button data-tab="${tab}">${T('Open','فتح')}</button>${allowedAction('export')?`<button class="accent" data-report-export="${tab}">Excel ↗</button>`:''}</div></section>`}
 function usersView(){if(state.me?.role!=='owner')return `<section class="panel">${T('Owner only','للمالك فقط')}</section>`;return `<section class="panel"><div class="panel-head"><div><h2>${T('Users & Permissions','المستخدمون والصلاحيات')}</h2><p>${T('RTM scope + page access + allowed actions','نطاق RTM + الصفحات + الأفعال المسموحة')}</p></div><button id="add-user" class="accent">＋ ${T('Add user','إضافة مستخدم')}</button></div><div class="user-grid">${state.users.map(u=>`<article class="user-card"><div><span class="user-avatar">${esc((u.displayName||u.username).slice(0,2).toUpperCase())}</span><div><h3>${esc(u.displayName||u.username)}</h3><small>@${esc(u.username)} · ${u.role==='owner'?'OWNER':'RTM USER'}</small></div></div><p><b>${T('Data:','البيانات:')}</b> ${u.allRtms?T('All RTMs','كل RTMs'):esc((u.rtms||[]).join(' + ')||'—')}</p><p><b>${T('Pages:','الصفحات:')}</b> ${fmt((u.pages||[]).length)} · <b>${T('Actions:','الأفعال:')}</b> ${esc((u.actions||[]).join(', '))}</p><footer><span class="status-dot ${u.active?'on':'off'}"></span>${u.active?T('Active','نشط'):T('Inactive','موقوف')}${u.role!=='owner'?`<button data-edit-user="${esc(u.username)}">${T('Edit permissions','تعديل الصلاحيات')}</button>`:''}</footer></article>`).join('')}</div></section><section class="panel"><h2>${T('Security model','نموذج الأمان')}</h2><p>${T('RTM data scope is enforced before data leaves the server. Users cannot export records outside their assigned RTMs. Settings and user management are Owner-only.','نطاق RTM يتم تطبيقه قبل خروج البيانات من السيرفر. لا يمكن للمستخدم تصدير سجلات خارج المناطق المسموحة له. الإعدادات وإدارة المستخدمين للمالك فقط.')}</p></section>`}
@@ -128,11 +121,11 @@ function loginScreen(message=''){
    button.disabled=true;button.classList.add('busy');status.textContent=T('Signing in…','جاري تسجيل الدخول…');
    try{
      if(location.protocol==='file:') throw new Error(T('Open the app through start.bat, not by double-clicking index.html.','شغّل البرنامج من start.bat، وليس بفتح index.html مباشرة.'));
-           const out=await api.call('login',{username,password});
+           const out=await api.call('login',{username,password,bootstrap:true,format:'columns'});
       if(!out.user||!out.token)throw new Error('Invalid login response');
       api.setToken(out.token);state.me=out.user;state.filters={};state.tab='dashboard';
 status.textContent=T('Signed in · loading latest prepared data…','تم الدخول · جاري تحميل أحدث بيانات جاهزة…');
-await refresh(true);
+await refresh(true,out.bootstrap);
    }catch(err){
      button.disabled=false;button.classList.remove('busy');status.textContent='';loginScreen(err.message||T('Login failed','فشل تسجيل الدخول'));
    }
@@ -145,11 +138,11 @@ function render(){
  if(!allowedPage(state.tab)&&!['settings','users'].includes(state.tab))state.tab='dashboard';if((state.tab==='settings'||state.tab==='users')&&state.me.role!=='owner')state.tab='dashboard';
  if(state.tab==='optional'&&(state.sheet==='All'||!data.sheets[state.sheet]))state.sheet=Object.keys(data.sheets).find(n=>n!=='All')||'All';
  activeRows=scoped();const issues=health(rows,data.sheets.All.columns,state.settings),dates=rows.map(r=>r._date).filter(Boolean).sort();const scope=state.me.allRtms||state.me.role==='owner'?T('All RTMs','كل RTMs'):(state.me.rtms||[]).join(' + ');
- $('#app').innerHTML=`<aside class="sidebar"><div class="brand brand-word logo-shine"><img class="official-logo" src="./gorilla-logo.png" alt="Gorilla Energy Drink"></div><nav aria-label="${T('Main navigation','القائمة الرئيسية')}">${navHTML()}</nav><div class="sidebar-slogan">POWER YOUR<br>FIELD INSTINCT</div><div class="sidebar-bottom"><span class="tag">V1.4.7 · WEB</span><p>${esc(state.me.displayName||state.me.username)}</p><small>${esc(scope)}</small></div></aside><main><header class="topbar"><div class="top-search-wrap"><span>⌕</span><input id="header-search" type="search" value="${esc(state.filters.search||'')}" placeholder="${T('Search stores, TDM, area…','ابحث بالمحل أو TDM أو المنطقة…')}"></div><div class="header-actions"><button class="top-chip">${esc(scope||T('All RTMs','كل RTMs'))}</button><button id="notifications" class="top-icon notif-btn">${qicons.bell}${unreadKeys.length>0?`<span class="notif-badge">${fmt(unreadKeys.length)}</span>`:''}</button><div class="user-chip"><span>${esc((state.me.displayName||state.me.username).slice(0,2).toUpperCase())}</span><div><b>${esc(state.me.displayName||state.me.username)}</b><small>${state.me.role==='owner'?'Owner':'RTM User'}</small></div></div><button id="lang" class="top-icon">${T('AR','EN')}</button><button id="refresh" class="top-icon" title="${T('Refresh data','تحديث البيانات')}" aria-label="${T('Refresh data','تحديث البيانات')}" ${state.busy?'disabled':''}>↻</button><button id="logout" class="top-icon">↪</button></div></header><div class="content"><div class="title-row ${state.tab==='dashboard'?'dashboard-title-row':''}"><div><p class="eyebrow">GORILLA · FIELD INTELLIGENCE</p><h1>${label(state.tab)}</h1><p class="subtitle">${esc(scope)} <span>·</span> ${!dates.length?T('No valid dates','لا توجد تواريخ صالحة'):dates[0]===dates.at(-1)?dates[0]:dates[0]+' → '+dates.at(-1)} <span>·</span> ${T('Updated','تحديث')} ${new Date(data.refreshed).toLocaleTimeString(state.lang==='ar'?'ar-EG':'en-GB',{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false})}</p></div><div class="actions">${allowedAction('export')?`<select id="export" aria-label="${T('Export','تصدير')}"><option value="">${T('Export ↗','تصدير ↗')}</option><option value="xlsx">Excel (.xlsx)</option><option value="csv">CSV</option>${allowedAction('print')?'<option value="pdf">PDF</option>':''}</select>`:''}</div></div>${!['settings','users','dashboard'].includes(state.tab)?filtersHTML():''}${state.issue?`<div class="notice">${ilabel(state.issue)} <button id="clear-issue">${T('Remove issue filter','إلغاء تصفية المشكلة')}</button></div>`:''}${data.warnings?.length?`<div class="notice" role="status">${data.warnings.map(esc).join("<br>")}</div>`:''}<div id="view">${view(state.tab,activeRows)}</div><div id="history-container">${selectedHistory()}</div><footer>${T('All metrics respect RTM access, Cycle/Week and active filters.','كل المؤشرات تحترم صلاحية RTM والسايكل/الأسبوع والفلاتر الحالية.')}<span>© 2026 Ahmed Salim. All rights reserved.</span></footer></div></main>`;
- bind();stopHero=bindHero($('.gorilla-carousel'),state.lang==='ar');if(state.tab==='geo')drawMap(activeRows);
+ $('#app').innerHTML=`<aside class="sidebar"><div class="brand brand-word logo-shine"><img class="official-logo" src="./gorilla-logo.png" alt="Gorilla Energy Drink"></div><nav aria-label="${T('Main navigation','القائمة الرئيسية')}">${navHTML()}</nav><div class="sidebar-slogan">POWER YOUR<br>FIELD INSTINCT</div><div class="sidebar-bottom"><span class="tag">V1.5.0 · WEB</span><p>${esc(state.me.displayName||state.me.username)}</p><small>${esc(scope)}</small></div></aside><main><header class="topbar"><div class="top-search-wrap"><span>⌕</span><input id="header-search" type="search" value="${esc(state.filters.search||'')}" placeholder="${T('Search stores, TDM, area…','ابحث بالمحل أو TDM أو المنطقة…')}"></div><div class="header-actions"><button class="top-chip">${esc(scope||T('All RTMs','كل RTMs'))}</button><button id="notifications" class="top-icon notif-btn">${qicons.bell}${unreadKeys.length>0?`<span class="notif-badge">${fmt(unreadKeys.length)}</span>`:''}</button><div class="user-chip"><span>${esc((state.me.displayName||state.me.username).slice(0,2).toUpperCase())}</span><div><b>${esc(state.me.displayName||state.me.username)}</b><small>${state.me.role==='owner'?'Owner':'RTM User'}</small></div></div><button id="lang" class="top-icon">${T('AR','EN')}</button><button id="refresh" class="top-icon" title="${T('Refresh data','تحديث البيانات')}" aria-label="${T('Refresh data','تحديث البيانات')}" ${state.busy?'disabled':''}>↻</button><button id="logout" class="top-icon">↪</button></div></header><div class="content"><div class="title-row ${state.tab==='dashboard'?'dashboard-title-row':''}"><div><p class="eyebrow">GORILLA · FIELD INTELLIGENCE</p><h1>${label(state.tab)}</h1><p class="subtitle">${esc(scope)} <span>·</span> ${!dates.length?T('No valid dates','لا توجد تواريخ صالحة'):dates[0]===dates.at(-1)?dates[0]:dates[0]+' → '+dates.at(-1)} <span>·</span> ${T('Updated','تحديث')} ${new Date(data.refreshed).toLocaleTimeString(state.lang==='ar'?'ar-EG':'en-GB',{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false})}</p></div><div class="actions">${allowedAction('export')?`<select id="export" aria-label="${T('Export','تصدير')}"><option value="">${T('Export ↗','تصدير ↗')}</option><option value="xlsx">Excel (.xlsx)</option><option value="csv">CSV</option>${allowedAction('print')?'<option value="pdf">PDF</option>':''}</select>`:''}</div></div>${!['settings','users','dashboard'].includes(state.tab)?filtersHTML():''}${state.issue?`<div class="notice">${ilabel(state.issue)} <button id="clear-issue">${T('Remove issue filter','إلغاء تصفية المشكلة')}</button></div>`:''}${data.warnings?.length?`<div class="notice" role="status">${data.warnings.map(esc).join("<br>")}</div>`:''}<div id="view">${view(state.tab,activeRows)}</div><div id="history-container">${selectedHistory()}</div><footer>${T('All metrics respect RTM access, Cycle/Week and active filters.','كل المؤشرات تحترم صلاحية RTM والسايكل/الأسبوع والفلاتر الحالية.')}<span>© 2026 Ahmed Salim. All rights reserved.</span></footer></div></main>`;
+ enhanceDashboard();bind();stopHero=bindHero($('.gorilla-carousel'),state.lang==='ar');if(state.tab==='geo')drawMap(activeRows);
 }
 function filtersHTML(){
- const fields=['RTM','Rep','Governorate','Area Name','Outlet Type'],filtersSource=state.tab==='optional'?supportingRows(data.sheets[state.sheet]):state.tab==='newstores'&&data.sheets.NewAdd?normalize(data.sheets.NewAdd.rows):rows;
+ const fields=['RTM','Rep','Governorate','Area Name','Outlet Type'],filtersSource=state.tab==='optional'?supportingRows(data.sheets[state.sheet]):rows;
  const hidden=new Set(state.appSettings?.filters?.[state.tab]||[]),show=k=>!hidden.has(k);
  const available=state.tab==='optional'?supportedFilters(data.sheets[state.sheet]):null;
  const optionsFor=k=>{const opts=[...new Set((available?filterSupporting(data.sheets[state.sheet],state.filters,k):filterRows(filtersSource,state.filters,k)).map(r=>String(r[k]??'')).filter(Boolean))].sort();if(state.filters[k]&&!opts.includes(state.filters[k]))opts.push(state.filters[k]);return opts;};
@@ -168,13 +161,10 @@ function filtersHTML(){
 function view(tab,rs){
  const stores=latest(rs),k=kpis(rs);
  if(tab==='reports')return reportsView(rs);
+ if(tab==='tdmphotos')return tdmPhotosView();
+ if(tab==='presencetrends')return comparisonView(rs,comparisonMode,{esc,fmt,T,filters:state.filters},true);
  if(tab==='users')return usersView();
  if(tab==='presence')return presenceView(currentPresence(),state.presenceMode,{T,esc,fmt,card,page:state.page,pagination,lang:state.lang});
- if(tab==='newstores'){
- if(!data.sheets.NewAdd)return `<section class="panel"><p>${T('The optional NewAdd sheet is not present.','ورقة NewAdd الاختيارية غير موجودة.')}</p></section>`;
- const fresh=filterRows(normalize(data.sheets.NewAdd.rows),state.filters),strong=fresh.filter(r=>yes(r['محل قوى'])),opportunity=strong.filter(r=>r._presence===false);
- return `<div class="notice">${T('Source: NewAdd. These records are separate from All and are not added to official visit KPIs. Shared filters apply only where this sheet contains the matching fields.','المصدر: NewAdd. هذه السجلات منفصلة عن All ولا تُضاف لمؤشرات الزيارات الرسمية. الفلاتر المشتركة تعمل عندما تحتوي هذه الورقة على الحقول المطابقة.')}</div><div class="metrics">${card(T('New outlets recorded','محلات جديدة مسجلة'),fmt(unique(fresh)),T('Unique Client Codes in NewAdd','أكواد فريدة داخل NewAdd'))}${card(T('Strong new outlets','محلات جديدة قوية'),fmt(strong.length),T('Explicit strong-store flag','حسب علامة المحل القوي الصريحة'))}${card(T('Strong without Gorilla','قوية بدون جوريلا'),fmt(opportunity.length),T('Priority distribution opportunities','فرص توزيع ذات أولوية'))}</div><div class="grid two">${bars(T('New stores by TDM','المحلات الجديدة حسب المندوب'),group(fresh,'Rep'),'Rep')}${bars(T('New stores by territory','المحلات الجديدة حسب المنطقة'),group(fresh,'RTM'),'RTM')}</div><section class="panel"><h2>${T('New store records','سجلات المحلات الجديدة')}</h2>${simpleTable(fresh.slice(state.page*40,state.page*40+40),['Date','Rep','RTM','Client','Client Code','نوع المحل','تصنيف المحل','محل قوى','هل يوجد لدى العميل منتج جوريلا ؟'])}${pagination(fresh.length)}</section>`;
- }
  if(tab==='dashboard')return dashboard(rs);
  if(tab==='all')return tableView(rs);
  if(tab==='stores')return `<section class="panel"><h2>${T('Outlet directory · select a store','دليل المحلات · اختر محلًا')}</h2><p>${T('One row per Client Code. Open a store for its complete history across the current workbook.','صف واحد لكل كود محل. افتح المحل لعرض تاريخه الكامل داخل الملف الحالي.')}</p>${storeTable(stores)}</section>`;
@@ -216,6 +206,7 @@ function settingsView(){
 }
 function optionalView(){const names=Object.keys(data.sheets).filter(n=>n!=='All');if(!names.length)return empty();if(!names.includes(state.sheet))state.sheet=names[0];const sheet=data.sheets[state.sheet],selected=filterSupporting(sheet,state.filters),unsupported=Object.keys(state.filters).filter(k=>state.filters[k]&&!supportedFilters(sheet).has(k));return `<section class="panel"><div class="panel-head"><h2>${T('Supporting source sheets','أوراق المصدر المساندة')}</h2><select id="sheet-select">${names.map(n=>`<option ${n===state.sheet?'selected':''}>${esc(n)}</option>`).join('')}</select></div><p>${T('Filters and exports apply to this sheet. Every source column is included. Unavailable fields are disabled.','الفلاتر والتصدير لهذه الورقة. كل أعمدة المصدر ظاهرة. الحقول غير المتاحة معطّلة.')}</p>${unsupported.length?`<p role="status">${T('Not available in this sheet: ','غير متاح في هذه الورقة: ')}${unsupported.map(k=>esc(fieldLabel(k))).join('، ')}</p>`:''}${simpleTable(selected.slice(state.page*40,state.page*40+40),sheet.columns)}${pagination(selected.length)}</section>`}
 function bind(){
+ if($('#comparison-mode'))$('#comparison-mode').onchange=e=>{comparisonMode=e.target.value;render();};
  document.querySelectorAll('[data-tab]').forEach(el=>el.onclick=()=>{const t=el.dataset.tab;if(!allowedPage(t))return;state.tab=t;state.page=0;render()});
  document.querySelectorAll('[data-filter]').forEach(el=>el.onclick=()=>apply(el.dataset.filter,el.dataset.value));document.querySelectorAll('[data-field]').forEach(el=>el.onchange=()=>apply(el.dataset.field,el.value));
  if($('#lang'))$('#lang').onclick=()=>{state.lang=state.lang==='en'?'ar':'en';render()};if($('#refresh'))$('#refresh').onclick=()=>checkFreshness(true);if($('#logout'))$('#logout').onclick=async()=>{try{await api.call('logout')}catch{}finally{endSession()}};
@@ -238,10 +229,10 @@ function endSession(message=''){sessionEpoch++;alertKeys=[];unreadKeys=[];lastSo
  api.setToken('');data=null;rows=[];state.me=null;state.users=[];state.selectedStore=null;state.filters={};state.tab='dashboard';state.appSettings=null;state.busy=false;
  if(map){map.stop();map.remove();map=null;}document.querySelectorAll('dialog[open]').forEach(d=>d.close());loginScreen(message);
 }
-async function refresh(initial=false){
+async function refresh(initial=false,preparedBundle=null){
  if(state.busy)return;const epoch=sessionEpoch;state.busy=true;if($('#refresh'))$('#refresh').disabled=true;
  try{
-  const bundle=await api.call('bootstrap',{format:'columns'});if(epoch!==sessionEpoch)return;
+  const bundle=preparedBundle||await api.call('bootstrap',{format:'columns'});if(epoch!==sessionEpoch)return;
   state.me=bundle.user;const next=prepareBundle(bundle,data);state.appSettings=bundle.settings||{};state.users=bundle.users||[];next.appSettings=state.appSettings;
   if(state.appSettings.analysis)state.settings={...state.settings,...state.appSettings.analysis};
   state.settings.tabs=state.appSettings.tabs||state.settings.tabs||{};state.theme=state.appSettings.theme||state.theme;
@@ -251,7 +242,7 @@ async function refresh(initial=false){
   localStorage.setItem('gorilla-known-columns',JSON.stringify(data.sheets.All.columns));
   state.columns=[...new Set(state.columns)].filter(c=>data.sheets.All.columns.includes(c));if(!state.columns.length)state.columns=data.sheets.All.columns.slice(0,10);
   updateAlerts();state.busy=false;render();
-  if(initial)void checkFreshness(false,true);
+  if(initial)void checkFreshness(false);
   return true;
  }catch(e){state.busy=false;if(e.code==='UNAUTHORIZED')return endSession(T('Your session ended. Please sign in again.','انتهت الجلسة. سجّل الدخول مرة أخرى.'));if(data){render();toast(T('Refresh failed. Previous data retained: ','فشل التحديث. البيانات السابقة محفوظة: ')+e.message)}else loginScreen(e.message)}
 }
@@ -273,7 +264,9 @@ function updateAlerts(){
  const seen=new Set(stored||alertKeys.filter(k=>JSON.parse(k)[0]==='column'));
  unreadKeys=alertKeys.filter(k=>!seen.has(k));
  if(stored===null)localStorage.setItem(key,JSON.stringify([...seen]));
- if(unreadKeys.some(k=>!lastSoundKeys.has(k)))playAlert();if(stored!==null&&unreadKeys.some(k=>JSON.parse(k)[0]==='data'&&!lastSoundKeys.has(k)))void notifyDevice();lastSoundKeys=new Set(unreadKeys);
+ const freshKeys=unreadKeys.filter(k=>!lastSoundKeys.has(k));
+ if(freshKeys.length){playAlert();if(stored!==null){const groups=new Map();for(const key of freshKeys){const [kind,detail]=JSON.parse(key),title=kind==='issue'?ilabel(detail):kind==='data'?T('Data updates','تحديث البيانات'):T('Source columns','أعمدة المصدر');groups.set(title,(groups.get(title)||0)+1);}toast([...groups].map(([name,count])=>`${name}: ${fmt(count)}`).join(' · '));}}
+ if(stored!==null&&freshKeys.some(k=>JSON.parse(k)[0]==='data'))void notifyDevice();lastSoundKeys=new Set(unreadKeys);
 }
 let lastSoundKeys=new Set();
 document.addEventListener('pointerdown',unlockAlertAudio,{once:true});
@@ -309,7 +302,7 @@ function showDialog(content){const d=$('#detail');d.innerHTML=`<div class="dialo
 function columnManager(){showDialog(`<h2>${T('Choose columns · new columns are included here','اختر الأعمدة · الأعمدة الجديدة تظهر هنا')}</h2><div class="actions" style="margin-bottom:20px"><button id="select-columns">${T('Select all','تحديد الكل')}</button><button id="reset-columns">${T('Core columns','الأعمدة الأساسية')}</button></div><div class="column-list">${data.sheets.All.columns.map(c=>`<label><input type="checkbox" data-column="${esc(c)}" ${state.columns.includes(c)?'checked':''}>${esc(c)}</label>`).join('')}</div><button id="save-columns" class="accent" style="margin-top:20px">${T('Apply columns','تطبيق الأعمدة')}</button>`);$('#select-columns').onclick=()=>document.querySelectorAll('[data-column]').forEach(x=>x.checked=true);$('#reset-columns').onclick=()=>document.querySelectorAll('[data-column]').forEach(x=>x.checked=['Date','Rep','RTM','Client','Client Code'].includes(x.dataset.column));$('#save-columns').onclick=()=>{const cols=[...document.querySelectorAll('[data-column]:checked')].map(x=>x.dataset.column);if(!cols.length)return toast(T('Choose at least one column','اختر عمودًا واحدًا على الأقل'));state.columns=cols;$('#detail').close();render()};}
 function selectedHistory(){
  if(!state.selectedStore)return '';
- const source=rows.some(r=>r._id===state.selectedStore)?rows:normalize(data.sheets.NewAdd?.rows||[]);
+ const source=rows;
  return inlineHistory(state.selectedStore,source,{T,esc,fmt,lang:state.lang,simpleTable,photoCard,photosFor});
 }
 function openStore(id){
@@ -321,8 +314,6 @@ function openPhoto(url,caption){const list=photosFor(rows),index=list.findIndex(
 function notificationEntries(filtered=false){
  const source=filtered?activeRows:rows,byRow=new Map(source.map(r=>[r._row,r]));
  const entries=health(source,data.sheets.All.columns,state.settings).filter(i=>i.severity!=='info').map(i=>{const r=byRow.get(i.row)||{};return {key:JSON.stringify(['issue',i.kind,i.column||'',r._id||'',r['Started At']||r.Date||'',r._sourceFile||'']),kind:i.kind,title:ilabel(i.kind),detail:[r.Client,r['Client Code'],r.Rep,r.Date].filter(Boolean).join(' · ')};});
- const missing=filtered?filterSupporting(data.sheets.Missing,state.filters):(data.sheets.Missing?.rows||[]);
- for(const r of missing)entries.push({key:JSON.stringify(['missing',r['Adhoc Serial']||r['Client Code']||r.Client,r._sourceDate||r.Date||'']),kind:'missing',title:T('Missing store','محل مفقود'),detail:[r.Client,r['Adhoc Serial'],r.RTM,r._sourceDate].filter(Boolean).join(' · ')});
  if(!filtered||!Object.values(state.filters).some(Boolean))for(const key of alertKeys){const k=JSON.parse(key);if(k[0]==='data'||k[0]==='column')entries.push({key,kind:k[0],title:k[0]==='data'?T('Source data updated','تم تحديث بيانات المصدر'):T('Source column','عمود في المصدر'),detail:k[0]==='column'?k.slice(1).join(' · '):T('Latest shared data is ready','أحدث البيانات المشتركة جاهزة')});}
  return [...new Map(entries.map(e=>[e.key,e])).values()];
 }
@@ -335,13 +326,13 @@ function drawMap(rs){const Leaflet=window.L;if(!Leaflet){$('#map').innerHTML=emp
 function exportSelection(scope){
  let records,columns,name;
  if(scope==='store'){
-  const source=rows.some(r=>r._id===state.selectedStore)?rows:normalize(data.sheets.NewAdd?.rows||[]);
+  const source=rows;
   records=enrichedPresenceRows(source.filter(r=>r._id===state.selectedStore&&r._presence===true),presenceReport(source),state.lang);columns=[...new Set(records.flatMap(Object.keys))];name='Store-'+state.selectedStore;
  }else if(state.tab==='notifications'){const seen=new Set(read('gorilla-read-alerts:'+state.me.username,[])),mode=$('#notification-read-filter')?.value||'all';records=notificationEntries(true).filter(e=>mode==='all'||seen.has(e.key)===(mode==='read')).map(e=>({Notification:e.title,Details:e.detail,Status:seen.has(e.key)?'Read':'Unread'}));columns=['Notification','Details','Status'];name='Notification-Center';
  }else if(state.tab==='presence'){
   const report=currentPresence();records=enrichedPresenceRows(modeRows(report,state.presenceMode),report,state.lang);columns=[...new Set([...data.sheets.All.columns,...records.flatMap(Object.keys)])];name='Gorilla-'+state.presenceMode;
  }else{
-  const sheet=state.tab==='optional'?data.sheets[state.sheet]:state.tab==='newstores'?data.sheets.NewAdd:null;
+  const sheet=state.tab==='optional'?data.sheets[state.sheet]:null;
   records=sheet?(state.tab==='newstores'?filterRows(normalize(sheet.rows),state.filters):filterSupporting(sheet,state.filters)):scoped();columns=sheet?sheet.columns:state.columns;name=sheet?(state.tab==='newstores'?'NewAdd':state.sheet):'All';
  }
  records=records.map(r=>({...r,...Object.fromEntries(columns.filter(c=>[STATUS_FIELD,'Visit Status (EN)','Status'].includes(c)).map(c=>[c,statusText(r[c],state.lang)]))}));
@@ -366,6 +357,29 @@ async function exportData(format,scope){
  }catch(e){toast(T('Export failed: ','فشل التصدير: ')+e.message)}
 }
 if(document.modelContext?.registerTool){try{Promise.resolve(document.modelContext.registerTool({name:'filter_gorilla_visits',description:'Apply a global search to the same visit views shown in this local dashboard.',inputSchema:{type:'object',properties:{search:{type:'string'}},required:['search'],additionalProperties:false},annotations:{readOnlyHint:false},execute(input){if(!input||typeof input.search!=='string'||Object.keys(input).some(k=>k!=='search'))throw Error('Expected search text');if(!data)throw Error('Data is not loaded');apply('search',input.search);return {visits:scoped().length};}})).catch(()=>{});}catch{}}
+function groupNotificationCards(root){
+ if(!root||root.querySelector('.notification-group'))return;
+ const groups=new Map();root.querySelectorAll('.notification-record').forEach(el=>{const title=el.querySelector('strong')?.textContent||T('Updates','تحديثات');if(!groups.has(title))groups.set(title,[]);groups.get(title).push(el)});
+ for(const [title,records] of groups){const section=document.createElement('details');section.className='notification-group';section.dataset.category=title;const summary=document.createElement('summary');summary.textContent=title+' · '+fmt(records.length);section.append(summary);records[0].before(section);records.forEach(r=>section.append(r));}
+ if(root.id==='notification-list'&&!$('#notification-category')){const label=document.createElement('label');label.textContent=T('Category ','التصنيف ');const select=document.createElement('select');select.id='notification-category';const all=document.createElement('option');all.value='';all.textContent=T('All categories','كل التصنيفات');select.append(all);for(const title of groups.keys()){const option=document.createElement('option');option.value=option.textContent=title;select.append(option);}label.append(select);root.before(label);}
+}
+document.addEventListener('change',e=>{if(!['notification-read-filter','notification-category'].includes(e.target.id))return;const mode=$('#notification-read-filter')?.value||'all',category=$('#notification-category')?.value||'';document.querySelectorAll('#notification-list .notification-group').forEach(group=>{const records=[...group.querySelectorAll('.notification-record')];for(const row of records)row.hidden=mode!=='all'&&row.dataset.read!==(mode==='read'?'true':'false');const visible=records.filter(r=>!r.hidden).length;group.hidden=!visible||Boolean(category&&group.dataset.category!==category);group.querySelector('summary').textContent=group.dataset.category+' · '+fmt(visible);});});
+function enhanceDashboard(){
+ document.querySelectorAll('.dashboard-quick .quick-card').forEach(card=>card.insertAdjacentHTML('afterbegin',quickIllustration(card.dataset.tab)));
+ const refreshButton=$('#refresh');if(refreshButton){refreshButton.title=T('Sync now from Drive','مزامنة الآن من Drive');refreshButton.setAttribute('aria-label',refreshButton.title);}
+ document.querySelectorAll('.tdm-rank [data-filter="Rep"]').forEach(button=>{const image=state.appSettings?.tdmPhotos?.[button.dataset.value];if(image&&/^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(image))button.querySelector('.avatar-dot').innerHTML=`<img alt="${esc(button.dataset.value)}" src="${image}">`;});
+ if(state.tab==='settings')$('#view').insertAdjacentHTML('afterbegin',`<section class="panel"><h2>${label('tdmphotos')}</h2><button data-tab="tdmphotos">${T('Manage profile photos','إدارة صور المندوبين')}</button></section>`);
+ groupNotificationCards($('#notification-list'));
+ const scroll=$('.presence-time-panel .table-wrap');if(scroll)scroll.scrollTop=scroll.scrollHeight;
+ document.querySelectorAll('[data-tdm-photo]').forEach(input=>input.onchange=async()=>{
+  const file=input.files?.[0];if(!file)return;if(!/^image\/(jpeg|png|webp)$/.test(file.type)||file.size>10*1024*1024)return toast(T('Choose a JPG, PNG or WebP under 10 MB','اختر صورة JPG أو PNG أو WebP أقل من 10 ميجابايت'));
+  input.disabled=true;const url=URL.createObjectURL(file);
+  try{const image=new Image();image.src=url;await image.decode();const canvas=document.createElement('canvas');canvas.width=canvas.height=96;const side=Math.min(image.width,image.height);canvas.getContext('2d').drawImage(image,(image.width-side)/2,(image.height-side)/2,side,side,0,0,96,96);let encoded=canvas.toDataURL('image/jpeg',.65);if(encoded.length>7200)encoded=canvas.toDataURL('image/jpeg',.35);if(encoded.length>7200)throw Error(T('Choose a simpler image','اختر صورة أبسط'));const result=await api.call('saveTdmPhoto',{rep:input.dataset.tdmPhoto,image:encoded});state.appSettings.tdmPhotos=result.photos;render();toast(T('Photo saved for all users','تم حفظ الصورة لكل المستخدمين'));}catch(e){toast(e.message)}finally{URL.revokeObjectURL(url);input.disabled=false;}
+ });
+}
+function tdmPhotosView(){if(state.me?.role!=='owner')return empty();return `<section class="panel"><div class="panel-head"><h2>${label('tdmphotos')}</h2><button data-tab="settings">${T('Back to Settings','رجوع للإعدادات')}</button></div><p>${T('Upload a photo for each TDM. Photos are cropped to a circle and shared across devices.','ارفع صورة لكل مندوب. الصورة تُقص لتناسب الدائرة وتظهر على كل الأجهزة.')}</p>${[...new Set(rows.map(r=>r.Rep).filter(Boolean))].sort().map(rep=>`<div class="tdm-photo-row">${state.appSettings?.tdmPhotos?.[rep]?`<img class="tdm-photo-preview" src="${esc(state.appSettings.tdmPhotos[rep])}" alt="${esc(rep)}">`:''}<strong>${esc(rep)}</strong><input aria-label="${esc(rep)}" data-tdm-photo="${esc(rep)}" type="file" accept="image/jpeg,image/png,image/webp"></div>`).join('')}</section>`;}
+const improvementStyles=document.createElement('link');improvementStyles.rel='stylesheet';improvementStyles.href='./improvements.css?v=1500';document.head.append(improvementStyles);
+const notificationObserver=new MutationObserver(()=>groupNotificationCards($('#detail')));notificationObserver.observe($('#detail'),{childList:true});
 if(api.hasSession())refresh(true);else loginScreen();
 
 

@@ -1,6 +1,6 @@
 const escape=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export const defaults=[
- {image:'./hero-ultimate.jpg',title:'POWER YOUR FIELD INSTINCT',subtitle:'Gorilla field intelligence',tone:'ultimate',page:'presence',caption:false},
+ {image:'',title:'POWER YOUR FIELD INSTINCT',subtitle:'Gorilla field intelligence',tone:'ultimate',page:'presence',caption:true},
  {image:'',title:'MANGO COCONUT',subtitle:'Discover availability, SKU distribution and your next opportunity.',tone:'mango',page:'availability',caption:true},
  {image:'',title:'WATERMELON MELON',subtitle:'Turn every visit into stronger execution.',tone:'watermelon',page:'execution',caption:true}
 ];
@@ -24,7 +24,7 @@ export function bindHero(root,ar=false){
 
  root.onkeydown=e=>{if(e.key==='ArrowRight'){show(index+1);e.preventDefault();}if(e.key==='ArrowLeft'){show(index-1);e.preventDefault();}};
  const timer=setInterval(()=>{if(!paused&&document.visibilityState==='visible')show(index+1);},Number(root.dataset.seconds)*1000);
- root.querySelectorAll('.hero-picture').forEach(img=>img.onerror=()=>{img.hidden=true;const notice=document.createElement('p');notice.className='hero-image-error';notice.textContent=ar?'تعذر تحميل صورة الهيرو. راجع رابط الصورة في الإعدادات.':'Hero image unavailable. Check its URL in Settings.';img.after(notice);});
+ root.querySelectorAll('.hero-picture').forEach(img=>{const fallback=()=>{if(img.dataset.failed)return;img.dataset.failed='true';img.hidden=true;const notice=document.createElement('div');notice.className='carousel-copy hero-image-error';const logo=document.createElement('img');logo.src='./gorilla-logo.png';logo.alt='Gorilla Energy Drink';logo.style.cssText='width:150px;max-width:80%;height:auto';const text=document.createElement('p');text.textContent=ar?'تعذر تحميل صورة الهيرو. راجع رابط الصورة في الإعدادات.':'Hero image unavailable. Check its URL in Settings.';notice.append(logo,text);if(!img.parentElement.querySelector('.carousel-copy'))img.after(notice);};img.onerror=fallback;if(img.complete&&!img.naturalWidth)fallback();});
  return()=>clearInterval(timer);
 }
 export function heroEditor(hero={},ar=false){
