@@ -183,7 +183,7 @@ function view(tab,rs){
  const eligible=stores.filter(r=>r._availability!==null&&r._gorilla!==null&&r._competitor!==null&&r._gorilla+r._competitor>0&&r._posm!==null),perfect=eligible.filter(r=>r._availability>=state.settings.perfectAvailability&&r._gorilla/(r._gorilla+r._competitor)*100>=state.settings.perfectShare&&r._posm>0);
  return `<div class="notice">${T('Perfect Store is a configurable V1 rule: assortment target + shelf-share target + at least one POSM unit. It is not a certified business standard.','Perfect Store قاعدة V1 قابلة للتعديل: هدف التشكيلة + هدف حصة الرف + وحدة دعاية واحدة على الأقل. ليست معيارًا تجاريًا معتمدًا.')}</div><div class="metrics">${card(T('POSM units','وحدات الدعاية'),fmt(k.posm),T('Sum of detailed POSM columns','مجموع أعمدة الدعاية التفصيلية'))}${card(T('Outlets with POSM','محلات بها دعاية'),fmt(stores.filter(r=>r._posm>0).length),T('Latest outlet visit','آخر زيارة للمحل'))}${card(T('Perfect Store','المحل المثالي'),eligible.length?pct(perfect.length/eligible.length):'—',fmt(perfect.length)+' / '+fmt(eligible.length)+' '+T('eligible outlets','محلات قابلة للتقييم'))}</div><div class="grid two">${bars(T('POSM execution by type','الدعاية حسب النوع'),POSM.map(p=>[p,sum(stores,p)]).filter(x=>x[1]>0).sort((a,b)=>b[1]-a[1]))}${bars(T('POSM units by territory','وحدات الدعاية حسب المنطقة'),group(stores,'RTM','_posm'),'RTM')}</div><section class="panel"><h2>${T('Execution follow-up','متابعة التنفيذ')}</h2>${storeTable(stores.filter(r=>!perfect.includes(r)))}</section>`;
  }
- if(tab==='geo')return `<section class="panel"><div class="panel-head"><h2>${T('Outlet coverage map','خريطة تغطية المحلات')}</h2><div class="actions"><span class="tag">${fmt(stores.filter(r=>r._geo).length)} ${T('mapped outlets','محلات على الخريطة')}</span><div class="map-mode-switch"><button data-map-mode="pins" class="${state.mapMode!=='zones'?'active':''}">${T('Pins','نقاط')}</button><button data-map-mode="zones" class="${state.mapMode==='zones'?'active':''}">${T('RTM zone heatmap','خريطة حرارية بالزونات')}</button></div></div></div><div class="map-legend" id="pin-legend" ${state.mapMode==='zones'?'style="display:none"':''}><span><i style="background:#66d9ef"></i>${T('Gorilla present','جوريلا موجودة')}</span><span><i style="background:#ed8b56"></i>${T('Gorilla absent','جوريلا غير موجودة')}</span><span>${T('Click a point for Store 360','اضغط على نقطة لعرض المحل 360')}</span></div><div class="map-layout"><div><div id="map" class="map"></div><p id="map-status" style="margin-top:14px">${T('Map tiles require internet. No API key or paid service.','الخريطة تحتاج إنترنت. لا تحتاج مفتاح API أو خدمة مدفوعة.')}</p><small>${fmt(stores.filter(r=>!r._geo).length)} ${T('outlets excluded because coordinates are invalid or missing.','محلات مستبعدة بسبب إحداثيات مفقودة أو غير صالحة.')}</small></div><aside id="zone-legend-wrap" ${state.mapMode==='zones'?'':'style="display:none"'}><div class="zone-legend" id="zone-legend"></div><small style="display:block;margin-top:10px">${T('Click a zone to show or hide it on the map.','اضغط على اسم الزون لإظهاره أو إخفاؤه على الخريطة.')}</small></aside></div></section><div class="grid two">${bars(T('Visits by governorate','الزيارات حسب المحافظة'),group(rs,'Governorate'),'Governorate')}${bars(T('Visits by area','الزيارات حسب المنطقة'),group(rs,'Area Name'),'Area Name')}</div>`;
+ if(tab==='geo')return `<section class="panel"><div class="panel-head"><h2>${T('Outlet coverage map','خريطة تغطية المحلات')}</h2><div class="actions"><span class="tag">${fmt(stores.filter(r=>r._geo).length)} ${T('mapped outlets','محلات على الخريطة')}</span><div class="map-mode-switch"><button data-map-mode="pins" class="${state.mapMode!=='zones'?'active':''}">${T('Pins','نقاط')}</button><button data-map-mode="zones" class="${state.mapMode==='zones'?'active':''}">${T('RTM zone heatmap','خريطة حرارية بالزونات')}</button></div></div></div><div class="map-legend" id="pin-legend" ${state.mapMode==='zones'?'style="display:none"':''}><span><i style="background:#66d9ef"></i>${T('Gorilla present','جوريلا موجودة')}</span><span><i style="background:#ed8b56"></i>${T('Gorilla absent','جوريلا غير موجودة')}</span><span>${T('Click a point for Store 360','اضغط على نقطة لعرض المحل 360')}</span></div><div class="map-layout"><div><div id="map" class="map"></div><p id="map-status" style="margin-top:14px">${T('Map tiles require internet. No API key or paid service.','الخريطة تحتاج إنترنت. لا تحتاج مفتاح API أو خدمة مدفوعة.')}</p><small>${fmt(stores.filter(r=>!r._geo).length)} ${T('outlets excluded because coordinates are invalid or missing.','محلات مستبعدة بسبب إحداثيات مفقودة أو غير صالحة.')}</small></div><aside id="zone-legend-wrap" ${state.mapMode==='zones'?'':'style="display:none"'}><div class="heat-scale-legend"><h3>${T('Presence level','مستوى التواجد')}</h3><div class="heat-scale-row"><i style="background:#e2352e"></i>${T('Very high','مرتفع جداً')}</div><div class="heat-scale-row"><i style="background:#f6921e"></i>${T('High','مرتفع')}</div><div class="heat-scale-row"><i style="background:#ffe11a"></i>${T('Medium','متوسط')}</div><div class="heat-scale-row"><i style="background:#8fd14f"></i>${T('Low','منخفض')}</div><div class="heat-scale-row"><i style="background:#bfe6b0"></i>${T('Very low','منخفض جداً')}</div></div><div class="zone-legend" id="zone-legend"></div><small style="display:block;margin-top:10px">${T('Click a zone to show or hide it on the map.','اضغط على اسم الزون لإظهاره أو إخفاؤه على الخريطة.')}</small></aside></div></section><div class="grid two">${bars(T('Visits by governorate','الزيارات حسب المحافظة'),group(rs,'Governorate'),'Governorate')}${bars(T('Visits by area','الزيارات حسب المنطقة'),group(rs,'Area Name'),'Area Name')}</div>`;
  if(tab==='photos')return galleryView(rs);
  if(tab==='health')return healthView(rs);
  if(tab==='notifications')return notificationView();
@@ -352,6 +352,22 @@ function zoneColor(name){
  const next=ZONE_PALETTE.find(c=>!used.includes(c))||ZONE_PALETTE[Object.keys(zoneColorCache).length%ZONE_PALETTE.length];
  zoneColorCache[name]=next;return next;
 }
+// Bins points into a grid and weighs each cell by presence strength (not just how many stores sit there),
+// so the heat shows where Gorilla is genuinely strong — like a football player heatmap, but weighted by
+// "how present is the product here" rather than "how many outlets happen to be here".
+function clusterPoints(points,cellMeters){
+ if(!points.length)return[];
+ const lat0=points[0][0];
+ const degLat=cellMeters/111320,degLng=cellMeters/(111320*Math.cos(lat0*Math.PI/180)||1);
+ const cells=new Map();
+ for(const p of points){
+  const key=Math.round(p[0]/degLat)+'|'+Math.round(p[1]/degLng);
+  if(!cells.has(key))cells.set(key,{sumLat:0,sumLng:0,n:0,w:0});
+  const c=cells.get(key);c.sumLat+=p[0];c.sumLng+=p[1];c.n+=1;c.w+=p[2];
+ }
+ const maxW=Math.max(...[...cells.values()].map(c=>c.w))||1;
+ return [...cells.values()].map(c=>[c.sumLat/c.n,c.sumLng/c.n,Math.min(1,0.15+0.85*(c.w/maxW))]);
+}
 function drawMap(rs){
  const Leaflet=window.L;
  if(!Leaflet){$('#map').innerHTML=empty();$('#map-status').textContent=T('Leaflet could not load. Check local vendor files.','تعذر تحميل Leaflet. تحقق من الملفات المحلية.');return}
@@ -366,21 +382,26 @@ function drawMap(rs){
   const byZone=new Map();
   for(const r of points){const z=r.RTM||T('Unassigned','بدون RTM');if(!byZone.has(z))byZone.set(z,[]);byZone.get(z).push(r);}
   const legendRows=[];
+  const HEAT_LEVELS=[
+   {from:0.00,to:0.20,color:'#bfe6b0'}, // منخفض جداً
+   {from:0.20,to:0.40,color:'#8fd14f'}, // منخفض
+   {from:0.40,to:0.60,color:'#ffe11a'}, // متوسط
+   {from:0.60,to:0.80,color:'#f6921e'}, // مرتفع
+   {from:0.80,to:1.00,color:'#e2352e'}  // مرتفع جداً
+  ];
+  const heatGradient={};
+  HEAT_LEVELS.forEach(l=>{heatGradient[Math.max(0.001,l.from)]=l.color;heatGradient[Math.max(0.002,l.to-0.001)]=l.color;});
   for(const [zoneName,zonePoints] of byZone){
    const color=zoneColor(zoneName);
    const present=zonePoints.filter(r=>r._presence===true).length;
    const group=Leaflet.layerGroup().addTo(map);
-   if(Leaflet.heatLayer)Leaflet.heatLayer(zonePoints.map(r=>[r._geo[0],r._geo[1],r._presence===true?1:0.35]),{
-    radius:26,blur:22,maxZoom:13,gradient:{0.2:'#39e0a6',0.5:'#ffd267',0.8:color,1:'#ff2f45'}
+   const clustered=clusterPoints(zonePoints.map(r=>[r._geo[0],r._geo[1],r._presence===true?1:0.12]),220);
+   if(Leaflet.heatLayer)Leaflet.heatLayer(clustered,{
+    radius:34,blur:28,maxZoom:13,minOpacity:.4,gradient:heatGradient
    }).addTo(group);
    if(zonePoints.length>=3){
     const hull=bufferHull(convexHull(zonePoints.map(r=>r._geo)),350);
     Leaflet.polygon(hull,{color,weight:2.5,fillColor:color,fillOpacity:.05}).addTo(group).bindTooltip(zoneName,{direction:'center',className:'zone-tip'});
-   }
-   for(const r of zonePoints){
-    const node=document.createElement('div');node.innerHTML=`<b>${esc(r.Client||r._id)}</b><p>${esc(r.Rep)} · ${esc(zoneName)}</p><button>${T('Open Store Overview','عرض بيانات المحل')}</button>`;
-    node.querySelector('button').onclick=()=>openStore(r._id);
-    Leaflet.circleMarker(r._geo,{radius:3,color,weight:1,fillColor:r._presence===true?'#fff':'#0c1d55',fillOpacity:.95}).addTo(group).bindPopup(node);
    }
    zoneLayerGroups[zoneName]=group;
    legendRows.push({zoneName,color,count:zonePoints.length,present});

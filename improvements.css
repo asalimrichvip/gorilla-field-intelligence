@@ -43,3 +43,7 @@
 .zone-legend .zone-sub{display:block;margin-top:2px}
 .zone-legend .zone-count{margin-inline-start:auto;font-size:.82rem}
 .leaflet-tooltip.zone-tip{font-weight:700;font-size:.8rem}
+.heat-scale-legend{border:1px solid var(--line);background:var(--panel2);border-radius:10px;padding:12px;margin-bottom:12px}
+.heat-scale-legend h3{margin:0 0 8px;font-size:.78rem;color:var(--muted);font-weight:600}
+.heat-scale-row{display:flex;align-items:center;gap:9px;font-size:.8rem;padding:4px 0}
+.heat-scale-row i{width:16px;height:16px;border-radius:4px;flex:none;display:inline-block}
