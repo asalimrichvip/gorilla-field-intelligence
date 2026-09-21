@@ -1,5 +1,5 @@
 import {POSM,BRANDS,num,sum,latest,group,cycleInfo} from './analytics.mjs';
-import {periodMetrics} from './trends.mjs?v=1510';
+import {periodMetrics} from './trends.mjs?v=1520';
 import {STATUS_FIELD,GORILLA_QUESTION,JUHAYNA_QUESTION} from './presentation.mjs';
 const DAY=86400000,day=s=>Math.floor(Date.parse(s+'T12:00:00Z')/DAY),iso=n=>new Date(n*DAY).toISOString().slice(0,10);
 const palette=['#479fff','#a78bfa','#26c6c2','#f5bb54','#ed8bba','#648bdb'];
