@@ -15,9 +15,9 @@ let disposeAssistant=()=>{};
 let comparisonMode='month';
 const $=s=>document.querySelector(s), esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const read=(k,d)=>{try{return JSON.parse(localStorage.getItem(k))??d}catch{return d}};
-const state={lang:read('gorilla-lang','en'),theme:read('gorilla-theme','ultimate'),tab:'dashboard',filters:{},page:0,columns:read('gorilla-columns',null),settings:read('gorilla-settings',{short:2,share:15,availability:0,perfectAvailability:6,perfectShare:20,tabs:{}}),issue:null,sheet:'All',busy:false,photoCategory:'',presenceMode:'present',selectedStore:null,me:null,users:[],appSettings:null,filterSettingsPage:'dashboard'};
+const state={lang:read('gorilla-lang','en'),theme:read('gorilla-theme','ultimate'),tab:'dashboard',filters:{},page:0,columns:read('gorilla-columns',null),settings:read('gorilla-settings',{short:2,share:15,availability:0,perfectAvailability:6,perfectShare:20,tabs:{}}),issue:null,sheet:'All',busy:false,photoCategory:'',presenceMode:'present',selectedStore:null,me:null,users:[],appSettings:null,filterSettingsPage:'dashboard',mapMode:read('gorilla-map-mode','pins')};
 let alertKeys=[],unreadKeys=[],checking=false,sessionEpoch=0;
-let data,rows=[],map,activeRows=[],failedPhotos=new Set();
+let data,rows=[],map,activeRows=[],failedPhotos=new Set(),zoneLayerGroups={};
 const T=(en,ar)=>state.lang==='ar'?ar:en;
 const labels={dashboard:['Dashboard','لوحة المعلومات'],presence:['Gorilla Presence','تواجد جوريلا'],performance:['TDMs','TDMs'],availability:['Availability & SKU','التوافر والأصناف'],market:['Market & Opportunity','السوق والفرص'],execution:['Execution & POSM','التنفيذ ومواد الدعاية'],geo:['Maps','الخرائط'],stores:['Store Overview','نظرة المحل'],photos:['Photo Gallery','معرض الصور'],all:['Visit Explorer','استكشاف الزيارات'],reports:['Reports','التقارير'],optional:['Supporting Data','البيانات المساندة'],health:['Data Health','جودة البيانات'],settings:['Settings','الإعدادات'],users:['Users & Permissions','المستخدمون والصلاحيات']};
 const icons={dashboard:'◫',presence:'◉',performance:'↗',availability:'▥',market:'◎',execution:'✓',geo:'⌖',stores:'▦',photos:'▧',all:'≡',reports:'▤',optional:'⊞',health:'♡',settings:'⚙',users:'♙'};
@@ -183,7 +183,7 @@ function view(tab,rs){
  const eligible=stores.filter(r=>r._availability!==null&&r._gorilla!==null&&r._competitor!==null&&r._gorilla+r._competitor>0&&r._posm!==null),perfect=eligible.filter(r=>r._availability>=state.settings.perfectAvailability&&r._gorilla/(r._gorilla+r._competitor)*100>=state.settings.perfectShare&&r._posm>0);
  return `<div class="notice">${T('Perfect Store is a configurable V1 rule: assortment target + shelf-share target + at least one POSM unit. It is not a certified business standard.','Perfect Store قاعدة V1 قابلة للتعديل: هدف التشكيلة + هدف حصة الرف + وحدة دعاية واحدة على الأقل. ليست معيارًا تجاريًا معتمدًا.')}</div><div class="metrics">${card(T('POSM units','وحدات الدعاية'),fmt(k.posm),T('Sum of detailed POSM columns','مجموع أعمدة الدعاية التفصيلية'))}${card(T('Outlets with POSM','محلات بها دعاية'),fmt(stores.filter(r=>r._posm>0).length),T('Latest outlet visit','آخر زيارة للمحل'))}${card(T('Perfect Store','المحل المثالي'),eligible.length?pct(perfect.length/eligible.length):'—',fmt(perfect.length)+' / '+fmt(eligible.length)+' '+T('eligible outlets','محلات قابلة للتقييم'))}</div><div class="grid two">${bars(T('POSM execution by type','الدعاية حسب النوع'),POSM.map(p=>[p,sum(stores,p)]).filter(x=>x[1]>0).sort((a,b)=>b[1]-a[1]))}${bars(T('POSM units by territory','وحدات الدعاية حسب المنطقة'),group(stores,'RTM','_posm'),'RTM')}</div><section class="panel"><h2>${T('Execution follow-up','متابعة التنفيذ')}</h2>${storeTable(stores.filter(r=>!perfect.includes(r)))}</section>`;
  }
- if(tab==='geo')return `<section class="panel"><div class="panel-head"><h2>${T('Outlet coverage map','خريطة تغطية المحلات')}</h2><span>${fmt(stores.filter(r=>r._geo).length)} ${T('mapped outlets','محلات على الخريطة')}</span></div><div class="map-legend"><span><i style="background:#66d9ef"></i>${T('Gorilla present','جوريلا موجودة')}</span><span><i style="background:#ed8b56"></i>${T('Gorilla absent','جوريلا غير موجودة')}</span><span>${T('Click a point for Store 360','اضغط على نقطة لعرض المحل 360')}</span></div><div id="map" class="map"></div><p id="map-status" style="margin-top:14px">${T('Map tiles require internet. No API key or paid service.','الخريطة تحتاج إنترنت. لا تحتاج مفتاح API أو خدمة مدفوعة.')}</p><small>${fmt(stores.filter(r=>!r._geo).length)} ${T('outlets excluded because coordinates are invalid or missing.','محلات مستبعدة بسبب إحداثيات مفقودة أو غير صالحة.')}</small></section><div class="grid two">${bars(T('Visits by governorate','الزيارات حسب المحافظة'),group(rs,'Governorate'),'Governorate')}${bars(T('Visits by area','الزيارات حسب المنطقة'),group(rs,'Area Name'),'Area Name')}</div>`;
+ if(tab==='geo')return `<section class="panel"><div class="panel-head"><h2>${T('Outlet coverage map','خريطة تغطية المحلات')}</h2><div class="actions"><span class="tag">${fmt(stores.filter(r=>r._geo).length)} ${T('mapped outlets','محلات على الخريطة')}</span><div class="map-mode-switch"><button data-map-mode="pins" class="${state.mapMode!=='zones'?'active':''}">${T('Pins','نقاط')}</button><button data-map-mode="zones" class="${state.mapMode==='zones'?'active':''}">${T('RTM zone heatmap','خريطة حرارية بالزونات')}</button></div></div></div><div class="map-legend" id="pin-legend" ${state.mapMode==='zones'?'style="display:none"':''}><span><i style="background:#66d9ef"></i>${T('Gorilla present','جوريلا موجودة')}</span><span><i style="background:#ed8b56"></i>${T('Gorilla absent','جوريلا غير موجودة')}</span><span>${T('Click a point for Store 360','اضغط على نقطة لعرض المحل 360')}</span></div><div class="map-layout"><div><div id="map" class="map"></div><p id="map-status" style="margin-top:14px">${T('Map tiles require internet. No API key or paid service.','الخريطة تحتاج إنترنت. لا تحتاج مفتاح API أو خدمة مدفوعة.')}</p><small>${fmt(stores.filter(r=>!r._geo).length)} ${T('outlets excluded because coordinates are invalid or missing.','محلات مستبعدة بسبب إحداثيات مفقودة أو غير صالحة.')}</small></div><aside id="zone-legend-wrap" ${state.mapMode==='zones'?'':'style="display:none"'}><div class="zone-legend" id="zone-legend"></div><small style="display:block;margin-top:10px">${T('Click a zone to show or hide it on the map.','اضغط على اسم الزون لإظهاره أو إخفاؤه على الخريطة.')}</small></aside></div></section><div class="grid two">${bars(T('Visits by governorate','الزيارات حسب المحافظة'),group(rs,'Governorate'),'Governorate')}${bars(T('Visits by area','الزيارات حسب المنطقة'),group(rs,'Area Name'),'Area Name')}</div>`;
  if(tab==='photos')return galleryView(rs);
  if(tab==='health')return healthView(rs);
  if(tab==='notifications')return notificationView();
@@ -227,6 +227,7 @@ function bind(){
  if($('#save-appearance'))$('#save-appearance').onclick=saveAppearance;
  if($('#filter-page-setting'))$('#filter-page-setting').onchange=e=>{state.filterSettingsPage=e.target.value;render()};
  document.querySelectorAll('[data-filter-visibility]').forEach(el=>el.onchange=async()=>{const page=state.filterSettingsPage,all=['cycle','week','search','date','rtm','tdm','governorate','area','outlet','gorilla','juhayna','status'];state.appSettings.filters=state.appSettings.filters||{};state.appSettings.filters[page]=all.filter(k=>{const box=document.querySelector(`[data-filter-visibility="${k}"]`);return box&&!box.checked});try{state.appSettings=(await api.call('saveSettings',{settings:{filters:state.appSettings.filters}})).settings;}catch(e){return toast(e.message)}toast(T('Filter visibility saved','تم حفظ إظهار الفلاتر'))});
+ document.querySelectorAll('[data-map-mode]').forEach(el=>el.onclick=()=>{state.mapMode=el.dataset.mapMode;localStorage.setItem('gorilla-map-mode',JSON.stringify(state.mapMode));render()});
  bindExtra();
 }
 function preset(v){if(!v)return;const today=new Date(),day=d=>[d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-');let from='',to='';if(v==='latest'){from=to=rows.map(r=>r._date).sort().at(-1)||''}else if(v!=='all'){to=day(today);if(v==='today')from=to;else if(v==='month')from=to.slice(0,7)+'01';else{today.setDate(today.getDate()-Number(v)+1);from=day(today)}}state.filters={...state.filters,from,to};state.page=0;render()}
@@ -327,7 +328,82 @@ function bindNotificationControls(){if($('#notification-read-filter'))$('#notifi
 async function notifyDevice(){try{if(!('Notification'in window)||Notification.permission!=='granted')return;await navigator.serviceWorker.register('./notifications-sw.js');const registration=await navigator.serviceWorker.ready;await registration.showNotification('Gorilla · Notification Center',{body:T('Updated data is ready. Open Gorilla to review.','البيانات الجديدة جاهزة. افتح جوريلا للمراجعة.'),icon:'./assets/gorilla-logo.png',tag:'gorilla-data-update',data:{url:location.href}});}catch{}}
 function notifications(){const fresh=new Set(unreadKeys),entries=notificationEntries().filter(e=>fresh.has(e.key));const seen=new Set([...read('gorilla-read-alerts:'+state.me.username,[]),...unreadKeys]);localStorage.setItem('gorilla-read-alerts:'+state.me.username,JSON.stringify([...seen]));unreadKeys=[];$('#notifications .notif-badge')?.remove();showDialog(`<h2>${label('notifications')}</h2>${entries.map(e=>`<article class="notification-record"><strong>${esc(e.title)}</strong><p>${esc(e.detail)}</p></article>`).join('')||T('No new notifications','لا توجد إشعارات جديدة')}<button id="open-notification-history">${T('Open notification history','فتح سجل الإشعارات')}</button>`);$('#open-notification-history').onclick=()=>{$('#detail').close();state.tab='notifications';state.filters={};render()};}
 
-function drawMap(rs){const Leaflet=window.L;if(!Leaflet){$('#map').innerHTML=empty();$('#map-status').textContent=T('Leaflet could not load. Check local vendor files.','تعذر تحميل Leaflet. تحقق من الملفات المحلية.');return}map=Leaflet.map('map',{scrollWheelZoom:false,zoomAnimation:false,fadeAnimation:false,markerZoomAnimation:false}).setView([30.05,31.25],10);let fallbackUsed=false;const addFallback=()=>{if(fallbackUsed)return;fallbackUsed=true;if($('#map-status'))$('#map-status').textContent=T('Map tiles could not load. Store markers remain available; check your connection.','تعذر تحميل خلفية الخريطة. نقاط المحلات متاحة؛ راجع الاتصال.')};const tile=Leaflet.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',maxZoom:19,crossOrigin:true}).addTo(map);let tileErrors=0;tile.on('tileerror',()=>{tileErrors+=1;if(tileErrors>=4)addFallback()});const points=latest(rs).filter(r=>r._geo);for(const r of points){const node=document.createElement('div');node.innerHTML=`<b>${esc(r.Client||r._id)}</b><p>${esc(r.Rep)} · ${esc(r.RTM)}</p><button>${T('Open Store Overview','عرض بيانات المحل')}</button>`;node.querySelector('button').onclick=()=>openStore(r._id);Leaflet.circleMarker(r._geo,{radius:6,color:r._presence===true?'#16d98a':r._presence===false?'#ff6d77':'#9daeb5',weight:2,fillOpacity:.86}).addTo(map).bindPopup(node);}if(points.length)map.fitBounds(Leaflet.latLngBounds(points.map(r=>r._geo)),{padding:[30,30],maxZoom:14,animate:false});}
+// Monotone-chain convex hull. pts: [[lat,lng],...] -> hull as [[lat,lng],...] (closed ring not required).
+function convexHull(pts){
+ const uniq=[...new Map(pts.map(p=>[p[0]+','+p[1],p])).values()].sort((a,b)=>a[0]-b[0]||a[1]-b[1]);
+ if(uniq.length<3)return uniq;
+ const cross=(o,a,b)=>(a[0]-o[0])*(b[1]-o[1])-(a[1]-o[1])*(b[0]-o[0]);
+ const lower=[];for(const p of uniq){while(lower.length>=2&&cross(lower[lower.length-2],lower[lower.length-1],p)<=0)lower.pop();lower.push(p);}
+ const upper=[];for(let i=uniq.length-1;i>=0;i--){const p=uniq[i];while(upper.length>=2&&cross(upper[upper.length-2],upper[upper.length-1],p)<=0)upper.pop();upper.push(p);}
+ lower.pop();upper.pop();return lower.concat(upper);
+}
+// Push each hull vertex outward from the centroid by roughly metersOut, so the boundary sits just past the outermost stores.
+function bufferHull(hull,metersOut){
+ if(hull.length<3)return hull;
+ const cLat=hull.reduce((a,p)=>a+p[0],0)/hull.length,cLng=hull.reduce((a,p)=>a+p[1],0)/hull.length;
+ const degLat=metersOut/111320,degLng=metersOut/(111320*Math.cos(cLat*Math.PI/180)||1);
+ return hull.map(p=>{const dLat=p[0]-cLat,dLng=p[1]-cLng,len=Math.hypot(dLat,dLng)||1;return [p[0]+(dLat/len)*degLat,p[1]+(dLng/len)*degLng];});
+}
+const ZONE_PALETTE=['#ff5c68','#18b8ff','#39e0a6','#ffd267','#c792ff','#ff9e5e','#5ee6c9','#f16fb0'];
+const zoneColorCache={};
+function zoneColor(name){
+ if(zoneColorCache[name])return zoneColorCache[name];
+ const used=Object.values(zoneColorCache);
+ const next=ZONE_PALETTE.find(c=>!used.includes(c))||ZONE_PALETTE[Object.keys(zoneColorCache).length%ZONE_PALETTE.length];
+ zoneColorCache[name]=next;return next;
+}
+function drawMap(rs){
+ const Leaflet=window.L;
+ if(!Leaflet){$('#map').innerHTML=empty();$('#map-status').textContent=T('Leaflet could not load. Check local vendor files.','تعذر تحميل Leaflet. تحقق من الملفات المحلية.');return}
+ map=Leaflet.map('map',{scrollWheelZoom:false,zoomAnimation:false,fadeAnimation:false,markerZoomAnimation:false}).setView([30.05,31.25],10);
+ let fallbackUsed=false;const addFallback=()=>{if(fallbackUsed)return;fallbackUsed=true;if($('#map-status'))$('#map-status').textContent=T('Map tiles could not load. Store markers remain available; check your connection.','تعذر تحميل خلفية الخريطة. نقاط المحلات متاحة؛ راجع الاتصال.')};
+ const tile=Leaflet.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',maxZoom:19,crossOrigin:true}).addTo(map);
+ let tileErrors=0;tile.on('tileerror',()=>{tileErrors+=1;if(tileErrors>=4)addFallback()});
+ const points=latest(rs).filter(r=>r._geo);
+ zoneLayerGroups={};
+ if(state.mapMode==='zones'){
+  if(!Leaflet.heatLayer){$('#map-status').textContent=T('leaflet-heat could not load. Check vendor files.','تعذر تحميل leaflet-heat. تحقق من ملفات vendor.');}
+  const byZone=new Map();
+  for(const r of points){const z=r.RTM||T('Unassigned','بدون RTM');if(!byZone.has(z))byZone.set(z,[]);byZone.get(z).push(r);}
+  const legendRows=[];
+  for(const [zoneName,zonePoints] of byZone){
+   const color=zoneColor(zoneName);
+   const present=zonePoints.filter(r=>r._presence===true).length;
+   const group=Leaflet.layerGroup().addTo(map);
+   if(Leaflet.heatLayer)Leaflet.heatLayer(zonePoints.map(r=>[r._geo[0],r._geo[1],r._presence===true?1:0.35]),{
+    radius:26,blur:22,maxZoom:13,gradient:{0.2:'#39e0a6',0.5:'#ffd267',0.8:color,1:'#ff2f45'}
+   }).addTo(group);
+   if(zonePoints.length>=3){
+    const hull=bufferHull(convexHull(zonePoints.map(r=>r._geo)),350);
+    Leaflet.polygon(hull,{color,weight:2.5,fillColor:color,fillOpacity:.05}).addTo(group).bindTooltip(zoneName,{direction:'center',className:'zone-tip'});
+   }
+   for(const r of zonePoints){
+    const node=document.createElement('div');node.innerHTML=`<b>${esc(r.Client||r._id)}</b><p>${esc(r.Rep)} · ${esc(zoneName)}</p><button>${T('Open Store Overview','عرض بيانات المحل')}</button>`;
+    node.querySelector('button').onclick=()=>openStore(r._id);
+    Leaflet.circleMarker(r._geo,{radius:3,color,weight:1,fillColor:r._presence===true?'#fff':'#0c1d55',fillOpacity:.95}).addTo(group).bindPopup(node);
+   }
+   zoneLayerGroups[zoneName]=group;
+   legendRows.push({zoneName,color,count:zonePoints.length,present});
+  }
+  legendRows.sort((a,b)=>b.count-a.count);
+  const legendEl=$('#zone-legend');
+  if(legendEl){
+   legendEl.innerHTML=legendRows.map(z=>`<div class="zone-row" data-zone="${esc(z.zoneName)}"><span class="swatch" style="background:${z.color}"></span><span><span class="zone-name">${esc(z.zoneName)}</span><small class="zone-sub">${fmt(z.present)}/${fmt(z.count)} ${T('present','متواجد')}</small></span><b class="zone-count">${z.count?Math.round(z.present/z.count*100):0}%</b></div>`).join('')||`<p class="empty">${T('No RTM assigned to mapped outlets.','لا يوجد RTM مرتبط بالمحلات على الخريطة.')}</p>`;
+   legendEl.querySelectorAll('.zone-row').forEach(row=>row.onclick=()=>{
+    const zn=row.dataset.zone,layer=zoneLayerGroups[zn];if(!layer)return;
+    const hidden=row.classList.toggle('off');
+    if(hidden)map.removeLayer(layer);else layer.addTo(map);
+   });
+  }
+ } else {
+  for(const r of points){
+   const node=document.createElement('div');node.innerHTML=`<b>${esc(r.Client||r._id)}</b><p>${esc(r.Rep)} · ${esc(r.RTM)}</p><button>${T('Open Store Overview','عرض بيانات المحل')}</button>`;
+   node.querySelector('button').onclick=()=>openStore(r._id);
+   Leaflet.circleMarker(r._geo,{radius:6,color:r._presence===true?'#16d98a':r._presence===false?'#ff6d77':'#9daeb5',weight:2,fillOpacity:.86}).addTo(map).bindPopup(node);
+  }
+ }
+ if(points.length)map.fitBounds(Leaflet.latLngBounds(points.map(r=>r._geo)),{padding:[30,30],maxZoom:14,animate:false});
+}
 function exportSelection(scope){
  let records,columns,name;
  if(scope==='store'){

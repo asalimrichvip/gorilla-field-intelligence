@@ -27,3 +27,19 @@
 @media(min-width:1550px){.mock-kpis .mock-kpi{grid-template-columns:62px minmax(0,1fr) auto}.mock-kpis .mock-kpi em{grid-column:3;grid-row:1/3;text-align:end;align-self:center;max-width:115px}}
 @media(max-width:1100px){.mock-kpis,.dashboard-quick{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:500px){.mock-kpis .mock-kpi{padding:12px;grid-template-columns:34px minmax(0,1fr);gap:8px}.mock-kpis .mock-kpi-icon{width:34px;height:44px}.mock-kpis .mock-kpi-icon svg{width:26px;height:26px}.mock-kpis .mock-kpi small{font-size:.66rem}.mock-kpis .mock-kpi strong{font-size:1.35rem}.dashboard-quick{grid-template-columns:1fr}.dashboard-quick .quick-card{min-height:145px}}
+
+/* --- Zone heatmap (RTM territory boundaries + heat) on the Maps page --- */
+.map-mode-switch{display:flex;gap:4px;background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:3px}
+.map-mode-switch button{background:transparent;border:0;color:var(--muted);padding:7px 12px;font-size:.78rem;border-radius:7px;cursor:pointer}
+.map-mode-switch button.active{background:var(--accent);color:var(--accentInk);font-weight:600}
+.map-layout{display:grid;grid-template-columns:1fr 280px;gap:16px;margin-top:14px}
+@media(max-width:1150px){.map-layout{grid-template-columns:1fr}}
+.zone-legend{display:flex;flex-direction:column;gap:6px}
+.zone-legend .zone-row{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:9px;border:1px solid var(--line);background:var(--panel2);cursor:pointer;transition:opacity .15s,border-color .15s}
+.zone-legend .zone-row:hover{border-color:var(--accent)}
+.zone-legend .zone-row.off{opacity:.4}
+.zone-legend .swatch{width:13px;height:13px;border-radius:4px;flex:none}
+.zone-legend .zone-name{display:block;font-weight:600;font-size:.82rem}
+.zone-legend .zone-sub{display:block;margin-top:2px}
+.zone-legend .zone-count{margin-inline-start:auto;font-size:.82rem}
+.leaflet-tooltip.zone-tip{font-weight:700;font-size:.8rem}
