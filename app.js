@@ -10,7 +10,7 @@ import {presenceView,modeRows,enrichedPresenceRows,inlineHistory,PRESENCE_MODES}
 import {trendChart,comparisonView} from './trends.mjs?v=1520';
 import {metricIcons,quickIllustration} from './cards.mjs?v=1520';
 import {mountRoyal} from './royal.mjs?v=1520';
-import {mountAssistant} from './assistant-ui.mjs?v=1521';
+import {mountAssistant} from './assistant-ui.mjs?v=1522';
 let disposeAssistant=()=>{};
 let comparisonMode='month';
 const $=s=>document.querySelector(s), esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -484,7 +484,7 @@ function enhanceDashboard(){
 function tdmPhotosView(){if(state.me?.role!=='owner')return empty();return `<section class="panel"><div class="panel-head"><h2>${label('tdmphotos')}</h2><button data-tab="settings">${T('Back to Settings','رجوع للإعدادات')}</button></div><p>${T('Upload a photo for each TDM. Photos are cropped to a circle and shared across devices.','ارفع صورة لكل مندوب. الصورة تُقص لتناسب الدائرة وتظهر على كل الأجهزة.')}</p>${[...new Set(rows.map(r=>r.Rep).filter(Boolean))].sort().map(rep=>`<div class="tdm-photo-row">${state.appSettings?.tdmPhotos?.[rep]?`<img class="tdm-photo-preview" src="${esc(state.appSettings.tdmPhotos[rep])}" alt="${esc(rep)}">`:''}<strong>${esc(rep)}</strong><input aria-label="${esc(rep)}" data-tdm-photo="${esc(rep)}" type="file" accept="image/jpeg,image/png,image/webp"></div>`).join('')}</section>`;}
 const improvementStyles=document.createElement('link');improvementStyles.rel='stylesheet';improvementStyles.href='./improvements.css?v=1520';document.head.append(improvementStyles);
 const royalStyles=document.createElement('link');royalStyles.rel='stylesheet';royalStyles.href='./royal.css?v=1520';document.head.append(royalStyles);
-const assistantStyles=document.createElement('link');assistantStyles.rel='stylesheet';assistantStyles.href='./assistant.css?v=1521';document.head.append(assistantStyles);
+const assistantStyles=document.createElement('link');assistantStyles.rel='stylesheet';assistantStyles.href='./assistant.css?v=1522';document.head.append(assistantStyles);
 const notificationObserver=new MutationObserver(()=>groupNotificationCards($('#detail')));notificationObserver.observe($('#detail'),{childList:true});
 if(api.hasSession())refresh(true);else loginScreen();
 

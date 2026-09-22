@@ -71,7 +71,38 @@ export function mountAssistant({getContext,authorizeExport,exportResult,canPage,
  }
  message('أهلًا! أقدر أطلع تواجد جوريلا وأصنافها، ترتيب المناديب، الزيارات، قياسات الأعمدة ومواد الدعاية. مثال: «أحسن 5 مناديب في نسبة تواجد مانجو 250». لو مش فاهم جزء من طلبك، هيتلوّن في رسالتك وأقولك ليه من زرار "ليه؟" تحت الرد.');
 
- function table(rows,columns){const wrap=document.createElement('div');wrap.className='assistant-table';const t=document.createElement('table'),head=t.createTHead().insertRow();for(const c of columns){const th=document.createElement('th');th.textContent=c;head.append(th);}const body=t.createTBody();for(const row of rows.slice(0,100)){const tr=body.insertRow();for(const c of columns)tr.insertCell().textContent=row[c]??'—';}wrap.append(t);chat.append(wrap);chat.scrollTop=chat.scrollHeight;}
+ // Renders one assistant reply as a single card: a small summary table, then a detailed/"استرشادي" table,
+ // then export controls that respect the person's chosen format — all inside the same chat bubble.
+ function resultCard(plan,result,metricNames){
+  const el=document.createElement('div');el.className='assistant-message bot assistant-result';
+  const summaryRows=[
+   ['المقياس',`${metricNames[plan.metric]}${plan.sku?' · '+plan.sku:''}${plan.field?' · '+plan.field:''}`],
+   ['الترتيب',plan.rate?'بالنسبة %':plan.rank?'بالعدد / القيمة':'—'],
+   ['الفترة الفعلية',result.dates.join(' → ')||'لا توجد زيارات مؤرخة'],
+   ['أساس التحليل',`${result.count} سجل/محل`]
+  ];
+  if(result.note)summaryRows.push(['ملاحظة',result.note]);
+  if(plan.rank)summaryRows.push(['تنبيه',"التعادل في آخر مركز مطلوب يظهر بالكامل."]);
+  const summaryHtml=`<table class="assistant-summary-table">${summaryRows.map(([k,v])=>`<tr><th>${esc(k)}</th><td>${esc(v)}</td></tr>`).join('')}</table>`;
+  el.innerHTML=`<div class="assistant-summary">${summaryHtml}</div>`;
+  if(!result.records.length){el.insertAdjacentHTML('beforeend','<p class="assistant-empty-note">لا توجد بيانات مطابقة داخل الفلاتر والصلاحيات الحالية.</p>');chat.append(el);chat.scrollTop=chat.scrollHeight;return el;}
+  el.insertAdjacentHTML('beforeend','<p class="assistant-table-title">جدول تفصيلي استرشادي</p>');
+  el.append(dataTable(result.records,result.columns));
+  if(result.details?.length){el.insertAdjacentHTML('beforeend','<p class="assistant-table-title">تفاصيل إضافية</p>');el.append(dataTable(result.details.slice(0,20),result.detailColumns));}
+  if(canExport()){
+   const actions=document.createElement('div');actions.className='assistant-actions';
+   for(const [label,records,columns,fmt] of [['تصدير التقرير Excel',result.records,result.columns,'xlsx'],['تصدير التقرير CSV',result.records,result.columns,'csv'],['تصدير التفاصيل Excel',result.details,result.detailColumns,'xlsx']]){
+    if(!records?.length)continue;
+    const b=document.createElement('button');b.type='button';b.textContent=label;
+    b.onclick=async()=>{b.disabled=true;try{await authorizeExport();if(disposed||!canExport())return;exportResult(records,columns,fmt);}catch(error){status.textContent=error.message;}finally{b.disabled=false;}};
+    actions.append(b);
+   }
+   el.append(actions);
+  }
+  chat.append(el);chat.scrollTop=chat.scrollHeight;
+  return el;
+ }
+ function dataTable(rows,columns){const wrap=document.createElement('div');wrap.className='assistant-table';const t=document.createElement('table'),head=t.createTHead().insertRow();for(const c of columns){const th=document.createElement('th');th.textContent=c;head.append(th);}const body=t.createTBody();for(const row of rows.slice(0,100)){const tr=body.insertRow();for(const c of columns)tr.insertCell().textContent=row[c]??'—';}wrap.append(t);return wrap;}
 
  panel.querySelector('.assistant-inputbar').onsubmit=e=>{
   e.preventDefault();
@@ -88,11 +119,12 @@ export function mountAssistant({getContext,authorizeExport,exportResult,canPage,
    const result=runRequest(plan,ctx);
    if(result.error){message(esc(result.error).replace(/\n/g,'<br>'),'bot',{plan});return;}
    const metricNames={presence:plan.absent?'غياب مؤكد':'تواجد',visits:'عدد الزيارات',stores:'عدد المحلات',errors:'ملاحظات جودة البيانات',facings:'مجموع الواجهات',field:'قياس/عرض العمود'};
-   message([`${esc(metricNames[plan.metric])}${plan.sku?' · '+esc(plan.sku):''}${plan.field?' · '+esc(plan.field):''}${plan.rate?' · الترتيب بالنسبة %':plan.rank?' · الترتيب بالعدد/القيمة':''}`,`الفترة الفعلية: ${esc(result.dates.join(' → ')||'لا توجد زيارات مؤرخة')} · ${result.count} سجل/محل أساس التحليل`,esc(result.note||''),plan.rank?'التعادل في آخر مركز مطلوب يظهر بالكامل.':''].filter(Boolean).join('<br>'),'bot',{plan});
-   if(!result.records.length){message(esc('لا توجد بيانات مطابقة داخل الفلاتر والصلاحيات الحالية.'));return;}
-   table(result.records,result.columns);if(result.details.length)table(result.details.slice(0,20),result.detailColumns);
-   if(canExport()){const actions=document.createElement('div');actions.className='assistant-actions';for(const [label,records,columns] of [['تصدير التقرير Excel',result.records,result.columns],['تصدير التفاصيل Excel',result.details,result.detailColumns],['تصدير التقرير CSV',result.records,result.columns]]){if(!records.length)continue;const b=document.createElement('button');b.type='button';b.textContent=label;b.onclick=async()=>{b.disabled=true;try{await authorizeExport();if(disposed||!canExport())return;exportResult(records,columns,label.endsWith('CSV')?'csv':'xlsx');}catch(error){status.textContent=error.message;}finally{b.disabled=false;}};actions.append(b);}chat.append(actions);}
-   chat.scrollTop=chat.scrollHeight;
+   resultCard(plan,result,metricNames);
+   const why=document.createElement('button');why.type='button';why.className='assistant-why';why.textContent='ليه؟ (اللي فهمته من طلبك)';
+   const box=document.createElement('div');box.className='assistant-why-box';box.hidden=true;
+   const understood=[...new Set(plan.keys||[])];
+   box.innerHTML=`${understood.length?`<p><b>فهمت إنك بتقصد:</b> ${understood.map(k=>esc(k)).join('، ')}</p>`:''}${plan.unclear?.length?`<p><b>مش متأكد من:</b> <mark class="unclear-term">${plan.unclear.map(esc).join('</mark>، <mark class="unclear-term">')}</mark></p>`:''}`;
+   why.onclick=()=>{box.hidden=!box.hidden;};chat.append(why,box);chat.scrollTop=chat.scrollHeight;
   }catch(error){message(esc('تعذر تنفيذ الطلب: '+error.message));}
  };
 
