@@ -61,7 +61,19 @@ export function parseRequest(text,{columns=[],rows=[],now=new Date()}={}){
  if(has('TODAY'))plan.from=plan.to=today;if(has('YESTERDAY'))plan.from=plan.to=shift(today,-1);if(has('THIS_WEEK')){plan.from=start;plan.to=today;}if(has('LAST_WEEK')){plan.from=shift(start,-7);plan.to=shift(start,-1);}if(has('LAST_TWO_WEEKS')){plan.from=shift(today,-13);plan.to=today;}
  if(has('CYCLE1')||has('CYCLE2')){const wanted=has('CYCLE1')?1:2,cycles=[...new Set(rows.filter(r=>r._date&&cycleInfo(r._date)?.cycle===wanted).map(r=>cycleInfo(r._date).start))];if(cycles.length!==1)issues.push('رقم السايكل بيتكرر؛ اختر سايكل محدد من الفلاتر أو اكتب نطاق تاريخه.');else{plan.from=cycles[0];plan.to=cycleInfo(cycles[0]).end;}}
  if(has('WEEK1')||has('WEEK2'))plan.week=has('WEEK1')?1:2;
+ plan.unclear=unclearTokens(text,keys,issues);
  return plan;
+}
+const STOPWORDS=new Set(['في','من','علي','عن','الي','إلى','و','او','أو','ال','يا','لو','ان','إن','مع','عند','هو','هي','انا','أنا','ايه','إيه','ده','دي','كام','فين','ليه','هل','دى','انت','إنت','عايز','عاوز','ممكن','لو سمحت','بقى','كده','the','a','an','of','in','on','for','and','or','to','is','are','me','my','please']);
+// Best-effort: which words in the raw request weren't matched to any known concept/alias,
+// so the UI can point at exactly the unclear part instead of a generic error.
+function unclearTokens(text,keys,issues){
+ if(!issues.length)return[];
+ const z=normalizeText(text);
+ const matchedWords=new Set();
+ for(const k of keys)for(const a of (D[k]||[]))for(const w of normalizeText(a).split(' '))if(w)matchedWords.add(w);
+ for(const c of Object.keys(fieldAliases))for(const a of fieldAliases[c])for(const w of normalizeText(a).split(' '))if(w)matchedWords.add(w);
+ return [...new Set(z.split(' ').filter(w=>w.length>1&&!/^\d+$/.test(w)&&!STOPWORDS.has(w)&&!matchedWords.has(w)))];
 }
 export function runRequest(plan,{rows,columns=[],settings={}}){
  if(plan.issues.length)return {error:plan.issues.join('\n')};
