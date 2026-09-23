@@ -1,4 +1,4 @@
-import {parseRequest,runRequest,normalizeText} from './assistant-engine.mjs?v=1521';
+import {parseRequest,runRequest,normalizeText} from './assistant-engine.mjs?v=1523';
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
 // Wrap words the assistant didn't recognize with a highlighted <mark>, so the person can see
@@ -14,7 +14,7 @@ function renderUserBubble(text,unclear){
  }).join('');
 }
 
-export function mountAssistant({getContext,authorizeExport,exportResult,canPage,canExport}){
+export function mountAssistant({getContext,authorizeExport,exportResult,canPage,canExport,aiParse}){
  const host=document.querySelector('.header-actions');if(!host)return()=>{};
  const button=document.createElement('button');button.id='gorilla-assistant';button.type='button';button.textContent='✦ Gorilla Assistant';button.setAttribute('aria-haspopup','dialog');host.prepend(button);
 
@@ -31,8 +31,9 @@ export function mountAssistant({getContext,authorizeExport,exportResult,canPage,
    </header>
    <div class="assistant-settings" hidden>
     <label>لغة الميكروفون<select id="assistant-language"><option value="ar-EG">العربية المصرية</option><option value="en-US">English</option></select></label>
+    <label class="assistant-toggle"><input type="checkbox" id="assistant-ai-first" checked><span>كل رسالة تتفهم بالذكاء الاصطناعي (Gemini) — لو اتقفل، هيستخدم الفهم المحلي السريع بس</span></label>
     <label class="assistant-toggle"><input type="checkbox" id="assistant-highlight" checked><span>لوّن الكلمات اللي مش فاهمها في طلبك</span></label>
-    <p class="assistant-settings-help">لو الرد قال إنه مش فاهم جزء من الطلب، هتلاقي الكلمة أو الكلمتين ملوّنة في رسالتك، وتقدر تدوس "ليه؟" تحت أي رد عشان تشوف الكلمات اللي فهمها فعلاً وليه استنتج كده.</p>
+    <p class="assistant-settings-help">لو Gemini مش فاهم جزء من طلبك، هتلاقي الكلمة أو الكلمتين ملوّنة في رسالتك. تقدر تدوس "ليه؟" تحت أي رد عشان تشوف اللي فهمه فعلاً.</p>
     <p class="assistant-privacy">الصوت يبدأ بطلبك فقط؛ ممكن المتصفح يبعته لخدمة تعرف على الكلام. راجع النص قبل الإرسال. الكتابة تشتغل من غير ميكروفون.</p>
    </div>
    <div class="assistant-conversation" aria-live="polite"></div>
@@ -48,7 +49,8 @@ export function mountAssistant({getContext,authorizeExport,exportResult,canPage,
  const query=panel.querySelector('#assistant-query'),chat=panel.querySelector('.assistant-conversation'),
   status=panel.querySelector('.assistant-status'),mic=panel.querySelector('[data-mic]'),
   send=panel.querySelector('.assistant-send'),settingsBtn=panel.querySelector('[data-settings]'),
-  settingsBox=panel.querySelector('.assistant-settings'),highlightToggle=panel.querySelector('#assistant-highlight');
+  settingsBox=panel.querySelector('.assistant-settings'),highlightToggle=panel.querySelector('#assistant-highlight'),
+  aiFirstToggle=panel.querySelector('#assistant-ai-first');
  let recognition=null,wantsListening=false,disposed=false,lastPlanByMsg=new WeakMap();
 
  function autoGrow(){query.style.height='auto';query.style.height=Math.min(140,query.scrollHeight)+'px';}
@@ -104,28 +106,60 @@ export function mountAssistant({getContext,authorizeExport,exportResult,canPage,
  }
  function dataTable(rows,columns){const wrap=document.createElement('div');wrap.className='assistant-table';const t=document.createElement('table'),head=t.createTHead().insertRow();for(const c of columns){const th=document.createElement('th');th.textContent=c;head.append(th);}const body=t.createTBody();for(const row of rows.slice(0,100)){const tr=body.insertRow();for(const c of columns)tr.insertCell().textContent=row[c]??'—';}wrap.append(t);return wrap;}
 
- panel.querySelector('.assistant-inputbar').onsubmit=e=>{
-  e.preventDefault();
-  const text=query.value.trim();if(!text)return;
-  if(recognition)stopMic(true);
-  const ctx=getContext();if(!ctx)return;
-  let plan;try{plan=parseRequest(text,ctx);}catch(error){message(esc('تعذر تحليل الطلب: '+error.message));return;}
-  query.value='';autoGrow();send.disabled=true;status.textContent='';
-  message(renderUserBubble(text,highlightToggle.checked?plan.unclear:[]),'user');
-  try{
-   if(plan.smalltalk){message(esc(plan.smalltalk),'bot',{plan});return;}
-   const target=plan.metric==='errors'?'health':plan.metric==='presence'?'presence':plan.metric==='visits'?'all':plan.metric==='stores'?'stores':plan.field==='_posm'||/POSTERS|RACK|SHELF|STICKER|POSM|COUNTER|STOPPER|PUSH_PULL|PALLET|CARTON/.test(plan.keys.join(' '))?'execution':'availability';
-   if(!canPage(target)||(plan.group==='Rep'&&!canPage('performance'))){message(esc('ليس لديك صلاحية صفحة التحليل المطلوبة.'),'bot',{plan});return;}
-   const result=runRequest(plan,ctx);
-   if(result.error){message(esc(result.error).replace(/\n/g,'<br>'),'bot',{plan});return;}
-   const metricNames={presence:plan.absent?'غياب مؤكد':'تواجد',visits:'عدد الزيارات',stores:'عدد المحلات',errors:'ملاحظات جودة البيانات',facings:'مجموع الواجهات',field:'قياس/عرض العمود'};
-   resultCard(plan,result,metricNames);
+ // Runs an already-parsed plan (from either Gemini or the local parser) and renders the result card.
+ async function runPlan(plan,ctx,badgeHtml){
+  const target=plan.metric==='errors'?'health':plan.metric==='presence'?'presence':plan.metric==='visits'?'all':plan.metric==='stores'?'stores':plan.field==='_posm'||/POSTERS|RACK|SHELF|STICKER|POSM|COUNTER|STOPPER|PUSH_PULL|PALLET|CARTON/.test((plan.keys||[]).join(' '))?'execution':'availability';
+  if(!canPage(target)||(plan.group==='Rep'&&!canPage('performance'))){message(esc('ليس لديك صلاحية صفحة التحليل المطلوبة.'),'bot',{plan});return;}
+  const result=runRequest(plan,ctx);
+  if(result.error){message(esc(result.error).replace(/\n/g,'<br>'),'bot',{plan});return;}
+  const metricNames={presence:plan.absent?'غياب مؤكد':'تواجد',visits:'عدد الزيارات',stores:'عدد المحلات',errors:'ملاحظات جودة البيانات',facings:'مجموع الواجهات',field:'قياس/عرض العمود'};
+  const card=resultCard(plan,result,metricNames);
+  if(badgeHtml)card.insertAdjacentHTML('afterbegin',badgeHtml);
+  if(plan.keys?.length||plan.unclear?.length){
    const why=document.createElement('button');why.type='button';why.className='assistant-why';why.textContent='ليه؟ (اللي فهمته من طلبك)';
    const box=document.createElement('div');box.className='assistant-why-box';box.hidden=true;
    const understood=[...new Set(plan.keys||[])];
    box.innerHTML=`${understood.length?`<p><b>فهمت إنك بتقصد:</b> ${understood.map(k=>esc(k)).join('، ')}</p>`:''}${plan.unclear?.length?`<p><b>مش متأكد من:</b> <mark class="unclear-term">${plan.unclear.map(esc).join('</mark>، <mark class="unclear-term">')}</mark></p>`:''}`;
    why.onclick=()=>{box.hidden=!box.hidden;};chat.append(why,box);chat.scrollTop=chat.scrollHeight;
-  }catch(error){message(esc('تعذر تنفيذ الطلب: '+error.message));}
+  }
+ }
+ // Local rule-based parse (instant, free, works offline) — used as a fallback when Gemini can't be reached.
+ function runLocal(text,ctx,userEl){
+  let plan;try{plan=parseRequest(text,ctx);}catch(error){message(esc('تعذر تحليل الطلب: '+error.message));return;}
+  if(userEl&&highlightToggle.checked&&plan.unclear?.length)userEl.innerHTML=renderUserBubble(text,plan.unclear);
+  if(plan.smalltalk){message(esc(plan.smalltalk),'bot',{plan});return;}
+  if(plan.issues.length){const el=message(esc(plan.issues.join('\n')).replace(/\n/g,'<br>'),'bot',{plan});return;}
+  runPlan(plan,ctx);
+ }
+ // Primary path: every message goes to Gemini first, so it feels like talking to it directly.
+ // The AI only ever sees the typed sentence + the list of real column names — never store data.
+ async function runViaAI(text,ctx,userEl){
+  status.textContent='بيفكر…';
+  try{
+   const res=await aiParse(text);
+   const p=res?.plan;
+   if(!p)throw new Error(res?.error||'رد غير متوقع.');
+   status.textContent='';
+   if(p.smalltalk){message(esc(p.smalltalk),'bot');return;}
+   if(p.unclear?.length&&highlightToggle.checked)userEl.innerHTML=renderUserBubble(text,p.unclear.map(w=>normalizeText(w)));
+   if(!p.metric){message(esc(p.clarify||'مش متأكد من المقصود بطلبك، ممكن توضحه أكتر؟'),'bot');return;}
+   const plan={text,keys:[],unclear:p.unclear||[],metric:p.metric,field:p.field||'',sku:p.sku||'',group:p.group||'',rank:p.rank||'',limit:Math.min(100,Math.max(1,Number(p.limit)||1)),absent:!!p.absent,rate:!!p.rate,filters:Array.isArray(p.filters)?p.filters:[],conditions:[],from:p.from||'',to:p.to||'',aggregation:p.aggregation==='average'?'average':'sum',issues:[]};
+   await runPlan(plan,ctx,`<p class="assistant-ai-badge">✦ Gemini${p.note?' — '+esc(p.note):''}</p>`);
+  }catch(error){
+   status.textContent='';
+   message(esc('تعذر الوصول للذكاء الاصطناعي (')+esc(error.message)+esc(')، هستخدم الفهم المحلي بدل كده:'));
+   runLocal(text,ctx,userEl);
+  }
+ }
+
+ panel.querySelector('.assistant-inputbar').onsubmit=e=>{
+  e.preventDefault();
+  const text=query.value.trim();if(!text)return;
+  if(recognition)stopMic(true);
+  const ctx=getContext();if(!ctx)return;
+  query.value='';autoGrow();send.disabled=true;status.textContent='';
+  const userEl=message(esc(text),'user');
+  if(aiParse&&aiFirstToggle.checked)runViaAI(text,ctx,userEl);else runLocal(text,ctx,userEl);
  };
 
  // ---- open / close ----

@@ -63,3 +63,8 @@ mark.unclear-term{background:#ffb33933;outline:1px solid #ffb339;border-radius:4
 .assistant-summary-table th{color:var(--muted);font-weight:600;width:38%;white-space:nowrap;vertical-align:top}
 .assistant-table-title{margin:2px 0 0;font-size:.76rem;font-weight:700;color:var(--muted)}
 .assistant-empty-note{margin:0;font-size:.82rem;color:var(--muted)}
+
+/* ---- Gemini AI fallback ---- */
+.assistant-ai-retry{display:block;margin-top:10px;background:var(--accent);color:var(--accentInk,#02102f);border:0;border-radius:8px;padding:8px 12px;font-size:.78rem;font-weight:600;cursor:pointer}
+.assistant-ai-retry:disabled{opacity:.6;cursor:default}
+.assistant-ai-badge{margin:0;font-size:.7rem;color:var(--accent);font-weight:600}

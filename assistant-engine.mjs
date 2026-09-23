@@ -14,7 +14,7 @@ const shift=(s,n)=>{const d=new Date(s+'T12:00:00Z');d.setUTCDate(d.getUTCDate()
 export function parseRequest(text,{columns=[],rows=[],now=new Date()}={}){
  const z=normalizeText(text),keys=identify(text),has=k=>keys.includes(k),issues=[];
  if(/^(صباح الخير|مساء الخير|ازيك|شكرا|تسلم|hello|hi|thanks)$/.test(z))return {smalltalk:'أهلًا! اسألني عن التواجد أو الزيارات أو الأصناف، والنتيجة من البيانات الحالية.'};
- const plan={text,keys,metric:'',field:'',group:has('TDM')?'Rep':has('RTM')?'RTM':'',rank:has('BEST')||has('TOP')?'best':has('WORST')||has('BOTTOM')?'worst':'',limit:1,absent:has('WITHOUT')||/مفيهوش|معندوش|ماعندوش|مافيهوش/.test(z),rate:/نسبه|percentage|percent|rate/.test(z),filters:[],conditions:[],from:'',to:'',issues};
+ const plan={text,keys,metric:'',field:'',group:has('TDM')?'Rep':has('RTM')?'RTM':'',rank:has('BEST')||has('TOP')?'best':has('WORST')||has('BOTTOM')?'worst':'',limit:1,absent:has('WITHOUT')||/مفيش|مافيش|فيهوش|فيهاش|عندوش|عندهاش|مش موجود|مش متواجد|غير متواجد|غير موجود|بدون|من غير|لا يوجد|مالهاش|ملهاش/.test(z),rate:/نسبه|percentage|percent|rate/.test(z),filters:[],conditions:[],from:'',to:'',issues};
  if((has('BEST')||has('TOP'))&&(has('WORST')||has('BOTTOM')))issues.push('حدد ترتيبًا واحدًا: الأعلى أم الأقل؟');
  const n=z.match(/(?:احسن|افضل|اسوا|اوحش|اضعف|اعلي|اعلى|اقل|اكتر|اول|اخر|top|bottom|best|worst)\s+(\d+)/);if(n)plan.limit=Math.min(100,Math.max(1,Number(n[1])));
  if(has('SUPERVISOR')||has('DM')){plan.group=columnFor(has('SUPERVISOR')?'SUPERVISOR':'DM',columns)||'';if(!plan.group)issues.push('عمود المشرف/المدير غير موجود في البيانات الحالية.');}
@@ -23,7 +23,7 @@ export function parseRequest(text,{columns=[],rows=[],now=new Date()}={}){
  const skuHits=skuKeys.filter(has);if(skuHits.length>1)issues.push('اختر صنفًا واحدًا للتقرير، أو اطلب كل الأصناف من صفحة Availability.');
  if(skuHits.length){plan.sku=SKU[skuKeys.indexOf(skuHits[0])];plan.metric=has('FACING')?'facings':'presence';}
  else if(/مانجو|mango|بطيخ|watermelon|التيميت|التميت|ultimate/.test(z))issues.push('حدد حجم الصنف: 250 أم 500 مل؟');
- if(!plan.metric&&(has('PRESENCE')||has('GORILLA_PRESENCE')||has('AVAILABILITY')||has('GORILLA')&&plan.absent))plan.metric='presence';
+ if(!plan.metric&&(has('PRESENCE')||has('GORILLA_PRESENCE')||has('AVAILABILITY')||(plan.absent&&(has('GORILLA')||has('STORE')))))plan.metric='presence';
  if(has('ERROR'))plan.metric='errors';
  if(!plan.metric&&has('VISIT'))plan.metric='visits';
  if(has('FACING')&&!plan.sku){plan.metric='field';plan.field='_gorilla';}
