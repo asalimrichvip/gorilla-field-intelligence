@@ -1,4 +1,4 @@
-import {SKU,latest,distinctVisits,visitStamp} from './analytics.mjs';
+import {SKU,latest,distinctVisits,visitStamp} from './analytics.mjs?v=1530';
 import {answerText,displayValue,googleMapsUrl,flavorColor} from './presentation.mjs';
 
 export const PRESENCE_MODES={

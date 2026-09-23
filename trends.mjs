@@ -1,4 +1,4 @@
-import {cycleInfo,latest,unique} from './analytics.mjs';
+import {cycleInfo,latest,unique} from './analytics.mjs?v=1530';
 
 export function periodMetrics(rows,mode='month',filters={}){
  const buckets=new Map();
@@ -9,8 +9,8 @@ export function periodMetrics(rows,mode='month',filters={}){
  if(filters._cycle){first=keyFor(filters._cycle);last=keyFor(cycleInfo(filters._cycle)?.end);}
  if(first&&last&&first<=last){let cursor=first;for(let i=0;cursor<=last&&i<1200;i++){if(!buckets.has(cursor))buckets.set(cursor,[]);const date=new Date((mode==='cycle'?cursor:cursor+'-01')+'T12:00:00Z');if(mode==='cycle')date.setUTCDate(date.getUTCDate()+14);else date.setUTCMonth(date.getUTCMonth()+1);cursor=keyFor(date.toISOString().slice(0,10));}}
  return [...buckets].sort(([a],[b])=>a.localeCompare(b)).map(([period,visits])=>{
-  const stores=latest(visits.filter(r=>r._id)),known=stores.filter(r=>r._presence===true||r._presence===false),present=stores.filter(r=>r._presence===true).length;
-  return {period,visits:visits.length,stores:unique(stores),present:visits.length?present:null,unknown:stores.length-known.length,rate:known.length?present/known.length:null};
+  const successful=visits.filter(r=>r._success===1),stores=latest(successful.filter(r=>r._id)),known=stores.filter(r=>r._presence===true||r._presence===false),present=stores.filter(r=>r._presence===true).length;
+  return {period,visits:successful.length,stores:unique(stores),present:successful.length?present:null,unknown:stores.length-known.length,rate:known.length?present/known.length:null};
  });
 }
 

@@ -35,24 +35,26 @@ export function normalize(rows){return rows.map((r,i)=>{
  const lat=num(r.Lat),lng=num(r.Lng),seconds=parseDuration(r['Total Duration']),duration=num(r['Duration (min)'])??(seconds===null?null:seconds/60);
  const skus=skuDetails(r),known=skus.filter(s=>s.quantity!==null),present=skus.filter(s=>s.quantity>0),hasSkuColumns=Object.keys(r).some(k=>SKU.includes(k)||k.startsWith('Gorilla ')&&k.includes('Facing Count'));
  const rawPosm=POSM.filter(k=>Object.hasOwn(r,k));
- const photos=[];for(const [key,value]of Object.entries(r)){if(typeof value!=='string')continue;for(const u of value.match(/https?:\/\/[^\s|]+/g)??[])if(/\.(jpg|jpeg|png|webp)(\?|$)/i.test(u))photos.push({url:u,category:key});}
+ const photos=[];for(const [key,value]of Object.entries(r)){if(typeof value!=='string')continue;const photoField=/photo|image|صورة/i.test(key);for(const u of value.match(/https?:\/\/[^\s|]+/g)??[])if(photoField||/\.(jpg|jpeg|png|webp)(\?|$)/i.test(u))photos.push({url:u,category:key});}
  const survey=triState(r[GORILLA_QUESTION])??triState(r['هل يوجد لدى العميل منتج جوريلا ؟']);
  const productPresence=present.length>0?true:known.length===SKU.length?false:null;
  const presence=survey===true||productPresence===true?true:survey===false||productPresence===false?false:null;
- return {...r,_row:i+2,_id:id,_date:dateValue(r.Date),_duration:duration,_availability:known.length===SKU.length?present.length:presence===false?0:hasSkuColumns?null:num(r.Availability),_skus:skus,_skuCount:known.length===SKU.length?present.length:presence===false?0:null,_surveyGorilla:survey===null?'unknown':String(survey),_juhayna:triState(r[JUHAYNA_QUESTION])===null?'unknown':String(triState(r[JUHAYNA_QUESTION])),_presenceConflict:survey!==null&&productPresence!==null&&survey!==productPresence,_posm:rawPosm.length?sum([r],x=>POSM.reduce((a,k)=>a+(num(x[k])??0),0)):num(r['POSM Units']),_gorilla:num(r['Gorilla Total Facings']),_competitor:num(r['Competitor Facings']),_presence:presence,_success:num(r['Successful Visit'])??(r['حالة الزيارة']?Number(r['حالة الزيارة']==='زيارة ناجحة'):null),_geo:lat!==null&&lng!==null&&Math.abs(lat)<=90&&Math.abs(lng)<=180&&(lat!==0||lng!==0)?[lat,lng]:null,_photos:photos};
+ const status=String(r['حالة الزيارة']??'').trim();
+ const success=status?Number(status==='زيارة ناجحة'):(num(r['Successful Visit'])??null);
+ return {...r,_row:i+2,_id:id,_date:dateValue(r.Date),_duration:duration,_availability:known.length===SKU.length?present.length:presence===false?0:hasSkuColumns?null:num(r.Availability),_skus:skus,_skuCount:known.length===SKU.length?present.length:presence===false?0:null,_surveyGorilla:survey===null?'unknown':String(survey),_juhayna:triState(r[JUHAYNA_QUESTION])===null?'unknown':String(triState(r[JUHAYNA_QUESTION])),_presenceConflict:survey!==null&&productPresence!==null&&survey!==productPresence,_posm:rawPosm.length?sum([r],x=>POSM.reduce((a,k)=>a+(num(x[k])??0),0)):num(r['POSM Units']),_gorilla:num(r['Gorilla Total Facings']),_competitor:num(r['Competitor Facings']),_presence:presence,_success:success,_geo:lat!==null&&lng!==null&&Math.abs(lat)<=90&&Math.abs(lng)<=180&&(lat!==0||lng!==0)?[lat,lng]:null,_photos:photos};
 });}
 export const visitStamp=r=>formatTimestamp(r['Started At']||r.Date||'');
 export function latest(rows){const map=new Map();for(const r of rows){if(!r._id)continue;const before=map.get(r._id);if(!before||visitStamp(r)>=visitStamp(before))map.set(r._id,r);}return [...map.values()];}
 export function filterRows(rows,f,omit){return rows.filter(r=>Object.entries(f).every(([k,v])=>!v||k===omit||(k==='search'?Object.values(r).some(x=>typeof x!=='object'&&String(x??'').toLowerCase().includes(v.toLowerCase())):k==='from'?r._date&&r._date>=v:k==='to'?r._date&&r._date<=v:k==='_sku'?(r._skus?.find(s=>s.name===v)?.quantity??num(r[v]))>0:k==='_brand'?num(v==='Gorilla'?r._gorilla:r[v])>0:k==='_presence'?String(r._presence)===v:k==='_cycle'?cycleInfo(r._date)?.key===v:k==='_week'?String(cycleInfo(r._date)?.week||'')===String(v):String(r[k]??'')===v)));}
 export function group(rows,key,metric){const m=new Map();for(const r of rows){const k=String(r[key]??'')||'—';m.set(k,(m.get(k)||0)+(metric?(num(r[metric])??0):1));}return [...m].sort((a,b)=>b[1]-a[1]);}
-export function kpis(rows){const stores=latest(rows),measured=stores.filter(r=>r._gorilla!==null&&r._competitor!==null),g=sum(measured,'_gorilla'),c=sum(measured,'_competitor');return {visits:rows.length,stores:stores.length,success:avg(rows,'_success'),availability:avg(stores,'_availability'),presence:avg(stores.map(r=>({...r,p:r._presence===null?null:Number(r._presence)})),'p'),share:g+c?g/(g+c):null,posm:stores.some(r=>r._posm!==null)?sum(stores,'_posm'):null,duration:avg(rows,'_duration'),orders:rows.some(r=>num(r['Order Cartons'])!==null)?sum(rows,'Order Cartons'):null};}
+export function kpis(rows){const stores=latest(rows),successful=rows.filter(r=>r._success===1),successfulStores=latest(successful),measured=successfulStores.filter(r=>r._gorilla!==null&&r._competitor!==null),g=sum(measured,'_gorilla'),c=sum(measured,'_competitor');return {visits:rows.length,stores:stores.length,success:avg(rows,'_success'),availability:avg(successfulStores,'_availability'),presence:avg(successfulStores.map(r=>({...r,p:r._presence===null?null:Number(r._presence)})),'p'),share:g+c?g/(g+c):null,posm:successfulStores.some(r=>r._posm!==null)?sum(successfulStores,'_posm'):null,duration:avg(rows,'_duration'),orders:rows.some(r=>num(r['Order Cartons'])!==null)?sum(rows,'Order Cartons'):null,successfulVisits:successful.length,successfulStores:successfulStores.length};}
 export function health(rows,columns,settings={short:2,share:15,availability:0}){const issues=[], seen=new Set();const add=(kind,severity,r)=>issues.push({kind,severity,row:r._row,id:r._id});for(const r of rows){
  if(!r._id)add('missingId','critical',r);if(!r._date)add('invalidDate','critical',r);else if(r._date>new Date().toISOString().slice(0,10))add('futureDate','warning',r);
  if(!r._geo)add('invalidGeo','warning',r);if(r._duration===null||r._duration<0||r._duration>480)add('invalidDuration','warning',r);
  if(r._duration!==null&&r._duration>=0&&r._duration<settings.short)add('shortVisit','warning',r);
- if(r._availability!==null&&r._availability<=settings.availability)add('noAvailability','critical',r);
- if(r._gorilla!==null&&r._competitor!==null&&r._gorilla+r._competitor>0&&r._gorilla/(r._gorilla+r._competitor)*100<settings.share)add('lowShare','warning',r);
- if(yes(r['محل قوى'])&&r._presence===false)add('strongOpportunity','warning',r);
+ if(r._success===1&&r._availability!==null&&r._availability<=settings.availability)add('noAvailability','critical',r);
+ if(r._success===1&&r._gorilla!==null&&r._competitor!==null&&r._gorilla+r._competitor>0&&r._gorilla/(r._gorilla+r._competitor)*100<settings.share)add('lowShare','warning',r);
+ if(r._success===1&&yes(r['محل قوى'])&&r._presence===false)add('strongOpportunity','warning',r);
  if(r._id&&r['Started At']){const key=r._id+'|'+visitStamp(r);if(seen.has(key))add('duplicate','critical',r);seen.add(key);}
  if(r._presenceConflict)add('presenceConflict','warning',r);
  if(r._posm!==null&&num(r['POSM Units'])!==null&&r._posm!==num(r['POSM Units']))add('posmMismatch','info',r);
@@ -66,15 +68,15 @@ export function distinctVisits(rs) {
  const seen=new Map();for(const r of rs){const key=r._id+'|'+(r['Started At']?visitStamp(r):r._date||'undated');const existing=seen.get(key);if(!existing||r._presence===true||existing._presence===null)seen.set(key,r);}return [...seen.values()];
 }
 export function presenceReport(all,filters={}) {
- const rawPeriod=filterRows(all,filters).filter(r=>r._id&&r._date);
+ const rawPeriod=filterRows(all,filters).filter(r=>r._id&&r._date&&r._success===1);
  const cycle=filters._cycle?cycleInfo(filters._cycle):null;
  const cycleEnd=cycle?(filters._week==='1'?cycle.weekEnd:cycle.end):'';
  const end=filters.to||filters._date||cycleEnd||rawPeriod.map(r=>r._date).filter(Boolean).sort().at(-1)||all.map(r=>r._date).filter(Boolean).sort().at(-1)||'';
  const period=rawPeriod.filter(r=>!end||r._date<=end);
  const historyFilters={...filters,from:'',to:end,_date:'',_cycle:'',_week:''};
- const cumulative=filterRows(all,historyFilters).filter(r=>r._id&&r._date&&(!end||r._date<=end));
+ const cumulative=filterRows(all,historyFilters).filter(r=>r._id&&r._date&&r._success===1&&(!end||r._date<=end));
  const presentRows=period.filter(r=>r._presence===true),cumulativeRows=cumulative.filter(r=>r._presence===true);
- const fullHistory=all.filter(r=>r._id&&r._date&&(!end||r._date<=end));
+ const fullHistory=all.filter(r=>r._id&&r._date&&r._success===1&&(!end||r._date<=end));
  const allKnownPresent=new Set(fullHistory.filter(r=>r._presence===true).map(r=>r._id));
  const unknownIds=new Set(fullHistory.filter(r=>r._presence===null).map(r=>r._id));
  const absences=new Map();for(const r of distinctVisits(period).filter(r=>r._presence===false)){if(!absences.has(r._id))absences.set(r._id,[]);absences.get(r._id).push(r);}

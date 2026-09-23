@@ -19,13 +19,14 @@ body.assistant-lock{overflow:hidden}
 .assistant-head-actions{display:flex;gap:6px}
 .assistant-head-actions button{width:34px;height:34px;border-radius:9px;border:1px solid var(--line);background:var(--panel);color:var(--text);font-size:1rem;cursor:pointer}
 
-.assistant-settings{border-bottom:1px solid var(--line);padding:14px 18px;background:var(--panel);display:flex;flex-direction:column;gap:10px;flex:none}
+.assistant-settings{position:absolute;top:72px;inset-inline:12px;z-index:6;border:1px solid var(--line);border-radius:12px;padding:14px 18px;background:var(--panel);display:flex;flex-direction:column;gap:10px;box-shadow:0 18px 48px #0006;max-height:calc(100% - 96px);overflow:auto}
+.assistant-settings[hidden]{display:none}
 .assistant-settings label{font-size:.78rem;display:flex;flex-direction:column;gap:5px}
 .assistant-settings select{padding:8px 10px;border-radius:8px;border:1px solid var(--line);background:var(--panel2);color:var(--text);font:inherit}
 .assistant-toggle{flex-direction:row!important;align-items:center;gap:8px!important}
 .assistant-settings-help,.assistant-privacy{font-size:.7rem;line-height:1.6;color:var(--muted);margin:0}
 
-.assistant-conversation{flex:1;overflow:auto;display:flex;flex-direction:column;gap:12px;padding:16px 18px}
+.assistant-conversation{flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:12px;padding:16px 18px}
 .assistant-message{white-space:pre-wrap;line-height:1.7;padding:11px 14px;border:1px solid var(--line);border-radius:14px;background:var(--panel);font-size:.86rem;overflow-wrap:anywhere;max-width:92%}
 .assistant-message.user{background:var(--accent);color:var(--accentInk,#02102f);align-self:flex-end;border-color:transparent}
 .assistant-message.user mark.unclear-term{background:#ffb3391a;outline:2px solid #ffb339;color:inherit;border-radius:4px;padding:0 2px}

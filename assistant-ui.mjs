@@ -1,4 +1,4 @@
-import {parseRequest,runRequest,normalizeText} from './assistant-engine.mjs?v=1523';
+import {parseRequest,runRequest,normalizeText} from './assistant-engine.mjs?v=1530';
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
 // Wrap words the assistant didn't recognize with a highlighted <mark>, so the person can see
@@ -25,13 +25,13 @@ export function mountAssistant({getContext,authorizeExport,exportResult,canPage,
    <header class="assistant-head">
     <div class="assistant-head-title"><span class="assistant-avatar">✦</span><div><h2 id="assistant-heading">مساعد جوريلا</h2><small>يجاوب من البيانات المسموحة لك والفلاتر الحالية</small></div></div>
     <div class="assistant-head-actions">
-     <button type="button" data-settings aria-haspopup="true" aria-label="الإعدادات">⚙</button>
+     <button type="button" data-settings aria-haspopup="true" aria-expanded="false" aria-label="الإعدادات">⚙</button>
      <button type="button" data-close aria-label="إغلاق">×</button>
     </div>
    </header>
    <div class="assistant-settings" hidden>
     <label>لغة الميكروفون<select id="assistant-language"><option value="ar-EG">العربية المصرية</option><option value="en-US">English</option></select></label>
-    <label class="assistant-toggle"><input type="checkbox" id="assistant-ai-first" checked><span>كل رسالة تتفهم بالذكاء الاصطناعي (Gemini) — لو اتقفل، هيستخدم الفهم المحلي السريع بس</span></label>
+    <label class="assistant-toggle"><input type="checkbox" id="assistant-ai-first" checked><span>الوضع الذكي لتوفير Gemini — الطلبات الواضحة تتحلل محليًا، وGemini يشتغل فقط لما الطلب يحتاج فهم أقوى</span></label>
     <label class="assistant-toggle"><input type="checkbox" id="assistant-highlight" checked><span>لوّن الكلمات اللي مش فاهمها في طلبك</span></label>
     <p class="assistant-settings-help">لو Gemini مش فاهم جزء من طلبك، هتلاقي الكلمة أو الكلمتين ملوّنة في رسالتك. تقدر تدوس "ليه؟" تحت أي رد عشان تشوف اللي فهمه فعلاً.</p>
     <p class="assistant-privacy">الصوت يبدأ بطلبك فقط؛ ممكن المتصفح يبعته لخدمة تعرف على الكلام. راجع النص قبل الإرسال. الكتابة تشتغل من غير ميكروفون.</p>
@@ -131,8 +131,7 @@ export function mountAssistant({getContext,authorizeExport,exportResult,canPage,
   if(plan.issues.length){const el=message(esc(plan.issues.join('\n')).replace(/\n/g,'<br>'),'bot',{plan});return;}
   runPlan(plan,ctx);
  }
- // Primary path: every message goes to Gemini first, so it feels like talking to it directly.
- // The AI only ever sees the typed sentence + the list of real column names — never store data.
+ // Gemini fallback path. The AI only sees the typed sentence + real column names — never store rows.
  async function runViaAI(text,ctx,userEl){
   status.textContent='بيفكر…';
   try{
@@ -152,6 +151,22 @@ export function mountAssistant({getContext,authorizeExport,exportResult,canPage,
   }
  }
 
+ // Quota-saving smart router:
+ // - clear/simple requests are executed locally with zero Gemini calls
+ // - ambiguous/unsupported requests are escalated to Gemini
+ // This keeps the free-tier request budget for the messages that actually need it.
+ function shouldUseGemini(text,ctx){
+  try{
+   const plan=parseRequest(text,ctx);
+   if(plan.smalltalk)return {use:false,plan};
+   if(plan.issues?.length)return {use:true,plan};
+   if(!plan.metric)return {use:true,plan};
+   return {use:false,plan};
+  }catch{
+   return {use:true,plan:null};
+  }
+ }
+
  panel.querySelector('.assistant-inputbar').onsubmit=e=>{
   e.preventDefault();
   const text=query.value.trim();if(!text)return;
@@ -159,16 +174,23 @@ export function mountAssistant({getContext,authorizeExport,exportResult,canPage,
   const ctx=getContext();if(!ctx)return;
   query.value='';autoGrow();send.disabled=true;status.textContent='';
   const userEl=message(esc(text),'user');
-  if(aiParse&&aiFirstToggle.checked)runViaAI(text,ctx,userEl);else runLocal(text,ctx,userEl);
+  if(aiParse&&aiFirstToggle.checked){
+   const route=shouldUseGemini(text,ctx);
+   if(route.use)runViaAI(text,ctx,userEl);
+   else{
+    if(route.plan?.smalltalk){message(esc(route.plan.smalltalk),'bot',{plan:route.plan});}
+    else runPlan(route.plan,ctx,'<p class="assistant-ai-badge">⚡ Local · بدون استهلاك Gemini</p>');
+   }
+  }else runLocal(text,ctx,userEl);
  };
 
  // ---- open / close ----
  function open(){panel.classList.add('open');panel.setAttribute('aria-hidden','false');document.body.classList.add('assistant-lock');query.focus();}
- function close(){panel.classList.remove('open');panel.setAttribute('aria-hidden','true');stopMic(true);status.textContent='';document.body.classList.remove('assistant-lock');}
+ function close(){settingsBox.hidden=true;settingsBtn.setAttribute('aria-expanded','false');panel.classList.remove('open');panel.setAttribute('aria-hidden','true');stopMic(true);status.textContent='';document.body.classList.remove('assistant-lock');}
  button.onclick=open;
  panel.querySelectorAll('[data-close]').forEach(b=>b.onclick=close);
  panel.addEventListener('keydown',e=>{if(e.key==='Escape')close();});
- settingsBtn.onclick=()=>{settingsBox.hidden=!settingsBox.hidden;};
+ settingsBtn.onclick=()=>{settingsBox.hidden=!settingsBox.hidden;settingsBtn.setAttribute('aria-expanded',String(!settingsBox.hidden));};
 
  // ---- mic: continuous listening with seamless auto-restart + no duplicated text ----
  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;

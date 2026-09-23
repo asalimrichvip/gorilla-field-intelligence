@@ -1,5 +1,5 @@
 import {D} from './voice-vocabulary.mjs?v=1520';
-import {latest,num,cycleInfo,health,SKU,POSM} from './analytics.mjs';
+import {latest,num,cycleInfo,health,SKU,POSM} from './analytics.mjs?v=1530';
 import {triState,formatDuration} from './presentation.mjs';
 export const normalizeText=s=>String(s??'').toLowerCase().replace(/[٠-٩]/g,c=>String('٠١٢٣٤٥٦٧٨٩'.indexOf(c))).replace(/[۰-۹]/g,c=>String('۰۱۲۳۴۵۶۷۸۹'.indexOf(c))).replace(/[ًٌٍَُِّْـ]/g,'').replace(/[أإآ]/g,'ا').replace(/ى/g,'ي').replace(/ة/g,'ه').replace(/[^\u0600-\u06ffa-z0-9]+/gi,' ').replace(/\s+/g,' ').trim();
 const articles=s=>s.split(' ').map(w=>/^[\u0600-\u06ff]+$/.test(w)?w.replace(/^(?:بال|وال|ال)(?=.{3})/,''):w).join(' ');
@@ -79,7 +79,10 @@ export function runRequest(plan,{rows,columns=[],settings={}}){
  if(plan.issues.length)return {error:plan.issues.join('\n')};
  let rs=rows.filter(r=>(!plan.from||r._date>=plan.from)&&(!plan.to||r._date<=plan.to)&&(!plan.week||cycleInfo(r._date)?.week===plan.week)&&plan.filters.every(f=>f.values.includes(String(r[f.field]||''))));
  const dateRange=rs.map(r=>r._date).filter(Boolean).sort();
- const base=plan.metric==='visits'||plan.metric==='errors'?rs:latest(rs.filter(r=>r._id));
+ const commercialFields=new Set(['_gorilla','_competitor','_posm',...POSM]);
+ const commercial=plan.metric==='presence'||Boolean(plan.sku)||commercialFields.has(plan.field);
+ const eligible=commercial?rs.filter(r=>r._success===1):rs;
+ const base=plan.metric==='visits'||plan.metric==='errors'?rs:latest(eligible.filter(r=>r._id));
  const filtered=base.filter(r=>plan.conditions.every(c=>triState(r[c.field])===true));
  const evidence=r=>{if(plan.field){const v=num(r[plan.field]);return v===null?triState(r[plan.field]):v>0;}if(!plan.sku)return r._presence;const sku=r._skus?.find(s=>s.name===plan.sku);const quantity=sku?.quantity??num(r[plan.sku]);return quantity===null?null:quantity>0;};
  let values=filtered,records=[],matched=[];
@@ -101,5 +104,5 @@ export function runRequest(plan,{rows,columns=[],settings={}}){
  const detailColumns=[...new Set(['Client Code','Client','Rep','RTM','Date',...(plan.sku?[plan.sku]:[]),...(fieldLabel?[fieldLabel]:[])])];
  const details=matched.map(r=>Object.fromEntries(detailColumns.map(c=>[c,c===fieldLabel?(plan.field==='_duration'?formatDuration(r[plan.field]==null?null:r[plan.field]*60):r[plan.field]):c===plan.sku?r._skus?.find(s=>s.name===plan.sku)?.quantity??r[c]:r[c]])));
  if(plan.field==='_duration')records=records.map(r=>({...r,'القيمة':formatDuration(r['القيمة']===null?null:r['القيمة']*60)}));
- return {records,columns:[...new Set(records.flatMap(Object.keys))],details,detailColumns,count:filtered.length,dates:[dateRange[0],dateRange.at(-1)].filter(Boolean),metric:plan.metric,sku:plan.sku,rank:plan.rank,rate:plan.rate,field:plan.field,group:plan.group,note:plan.metric==='presence'?'كل عميل مرة واحدة بآخر زيارة في الفترة؛ يُنسب لمندوب آخر زيارة. العدد هو الأساس ما لم تطلب النسبة. الحالات غير المعروفة خارج مقام النسبة.':plan.metric==='errors'?'الترتيب بعدد ملاحظات جودة البيانات التحذيرية والحرجة؛ مش عدد الزيارات الخاطئة.':plan.metric==='visits'?'عدد سجلات الزيارات داخل النطاق.':'آخر زيارة لكل عميل داخل النطاق؛ القياسات الناقصة لا تُعتبر صفرًا.'};
+ return {records,columns:[...new Set(records.flatMap(Object.keys))],details,detailColumns,count:filtered.length,dates:[dateRange[0],dateRange.at(-1)].filter(Boolean),metric:plan.metric,sku:plan.sku,rank:plan.rank,rate:plan.rate,field:plan.field,group:plan.group,note:plan.metric==='presence'?'كل عميل مرة واحدة بآخر زيارة ناجحة في الفترة؛ يُنسب لمندوب آخر زيارة ناجحة. العدد هو الأساس ما لم تطلب النسبة. الحالات غير المعروفة خارج مقام النسبة.':commercial?'المؤشر التجاري محسوب من الزيارات الناجحة فقط، وبآخر زيارة ناجحة لكل عميل داخل النطاق.':plan.metric==='errors'?'الترتيب بعدد ملاحظات جودة البيانات التحذيرية والحرجة؛ مش عدد الزيارات الخاطئة.':plan.metric==='visits'?'عدد سجلات الزيارات داخل النطاق.':'آخر زيارة لكل عميل داخل النطاق؛ القياسات الناقصة لا تُعتبر صفرًا.'};
 }

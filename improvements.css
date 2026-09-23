@@ -47,3 +47,13 @@
 .heat-scale-legend h3{margin:0 0 8px;font-size:.78rem;color:var(--muted);font-weight:600}
 .heat-scale-row{display:flex;align-items:center;gap:9px;font-size:.8rem;padding:4px 0}
 .heat-scale-row i{width:16px;height:16px;border-radius:4px;flex:none;display:inline-block}
+
+/* --- 1.5.2 business review additions --- */
+.distribution-switch .panel-head{align-items:center}.distribution-switch select,.panel-head .actions select,.panel-head .actions input{min-height:38px}
+.map-status-filter{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0}.map-status-filter label{display:inline-flex;align-items:center;gap:7px;padding:8px 11px;border:1px solid var(--line);border-radius:10px;background:var(--panel2);cursor:pointer}.map-status-filter i{width:12px;height:12px;border-radius:50%;display:inline-block}.map-status-filter input{accent-color:var(--accent)}
+.round-control-panel .actions{display:flex;gap:10px;flex-wrap:wrap}.danger{border-color:#ef444488!important;color:#ff8a8a!important;background:#ef444414!important}.danger:hover{background:#ef444425!important}
+.notification-record{padding:13px 14px;border:1px solid var(--line);border-radius:10px;background:var(--panel2);margin:10px 0}.notification-record strong{display:block;margin-bottom:5px}.notification-record p{margin:0 0 6px}.notification-record small{color:var(--muted)}
+.settings-grid .round-control-panel{grid-column:span 1}
+.table-wrap table td .link-button{white-space:nowrap}
+@media(max-width:700px){.map-status-filter label{flex:1 1 45%}.round-control-panel .actions>button{flex:1 1 100%}}
+.compare-photo-strip{display:flex;flex-wrap:wrap;gap:8px}.photo-mini{width:72px;height:72px;padding:0;border:1px solid var(--line);border-radius:9px;overflow:hidden;background:var(--panel2)}.photo-mini img{width:100%;height:100%;object-fit:cover;display:block}

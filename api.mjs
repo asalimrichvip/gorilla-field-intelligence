@@ -28,7 +28,7 @@ export function prepareSheet(result) {
 }
 export async function loadSheets(api,previous){
   const sheets={},ignored={},warnings=[],schemaChanges=[];
-  for(const name of ['All','Start-End']){
+  for(const name of ['All','Start-End','NewStores','RoutePlan']){
     try{
       const response=await api.call('data',{sheet:name});
       const sheet=prepareSheet(response);sheets[name]=sheet;ignored[name]=sheet.ignored;
