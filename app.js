@@ -10,7 +10,7 @@ import {presenceView,modeRows,enrichedPresenceRows,inlineHistory,PRESENCE_MODES}
 import {trendChart,comparisonView} from './trends.mjs?v=1530';
 import {metricIcons,quickIllustration} from './cards.mjs?v=1520';
 import {mountRoyal} from './royal.mjs?v=1532';
-import {mountAssistant} from './assistant-ui.mjs?v=1530';
+import {mountAssistant} from './assistant-ui.mjs?v=1534';
 let disposeAssistant=()=>{};
 let comparisonMode='month';
 const $=s=>document.querySelector(s), esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));

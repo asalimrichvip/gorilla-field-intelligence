@@ -61,20 +61,40 @@ function handleAiInterpret(payload) {
   };
 
   var url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=' + apiKey;
-  var response;
-  try {
-    response = UrlFetchApp.fetch(url, {
-      method: 'post',
-      contentType: 'application/json',
-      payload: JSON.stringify(body),
-      muteHttpExceptions: true
-    });
-  } catch (e) {
-    return {ok: false, error: 'تعذر الوصول لخدمة Gemini: ' + e.message};
+  var response = null;
+  var code = 0;
+  var lastError = '';
+  var retryDelays = [0, 1500, 3500, 7000];
+  var transientCodes = {408:true, 429:true, 500:true, 502:true, 503:true, 504:true};
+
+  for (var attempt = 0; attempt < retryDelays.length; attempt++) {
+    if (retryDelays[attempt] > 0) Utilities.sleep(retryDelays[attempt]);
+    try {
+      response = UrlFetchApp.fetch(url, {
+        method: 'post',
+        contentType: 'application/json',
+        payload: JSON.stringify(body),
+        muteHttpExceptions: true
+      });
+      code = response.getResponseCode();
+      if (code === 200) break;
+      lastError = response.getContentText().slice(0, 300);
+      if (!transientCodes[code]) break;
+    } catch (e) {
+      lastError = String(e && e.message ? e.message : e);
+      code = 0;
+      if (attempt === retryDelays.length - 1) break;
+    }
   }
 
-  var code = response.getResponseCode();
-  if (code !== 200) return {ok: false, error: 'Gemini رجع خطأ (' + code + '): ' + response.getContentText().slice(0, 300)};
+  if (!response || code !== 200) {
+    return {
+      ok: false,
+      code: code || 'GEMINI_TEMP_UNAVAILABLE',
+      retryable: code === 0 || !!transientCodes[code],
+      error: 'Gemini غير متاح مؤقتًا بعد المحاولات التلقائية' + (code ? ' (' + code + ')' : '') + ': ' + lastError
+    };
+  }
 
   var data;
   try { data = JSON.parse(response.getContentText()); } catch (e) { return {ok: false, error: 'رد غير صالح من Gemini.'}; }

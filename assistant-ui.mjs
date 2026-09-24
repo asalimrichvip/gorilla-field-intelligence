@@ -51,7 +51,7 @@ export function mountAssistant({getContext,authorizeExport,exportResult,canPage,
   send=panel.querySelector('.assistant-send'),settingsBtn=panel.querySelector('[data-settings]'),
   settingsBox=panel.querySelector('.assistant-settings'),highlightToggle=panel.querySelector('#assistant-highlight'),
   aiFirstToggle=panel.querySelector('#assistant-ai-first');
- let recognition=null,wantsListening=false,disposed=false,lastPlanByMsg=new WeakMap();
+ let recognition=null,wantsListening=false,disposed=false,lastPlanByMsg=new WeakMap(),geminiRecoveryTimer=null,geminiRecoveryAttempt=0;
 
  function autoGrow(){query.style.height='auto';query.style.height=Math.min(140,query.scrollHeight)+'px';}
  query.addEventListener('input',()=>{autoGrow();send.disabled=!query.value.trim();});
@@ -132,10 +132,43 @@ export function mountAssistant({getContext,authorizeExport,exportResult,canPage,
   runPlan(plan,ctx);
  }
  // Gemini fallback path. The AI only sees the typed sentence + real column names — never store rows.
+ function transientGeminiError(error){
+  const s=String(error?.message||error||'').toLowerCase();
+  return s.includes('503')||s.includes('429')||s.includes('unavailable')||s.includes('high demand')||s.includes('temporarily')||s.includes('timeout')||s.includes('timed out')||s.includes('try again');
+ }
+ const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+ async function aiParseWithRetry(text){
+  const delays=[0,2500];let last;
+  for(let i=0;i<delays.length;i++){
+   if(delays[i]){status.textContent=`Gemini مشغول مؤقتًا — محاولة تلقائية ${i+1}/${delays.length}…`;await wait(delays[i]);}
+   try{return await aiParse(text)}catch(error){last=error;if(!transientGeminiError(error)||i===delays.length-1)throw error;}
+  }
+  throw last||new Error('Gemini unavailable');
+ }
+ function startGeminiRecovery(text){
+  if(!aiParse||disposed||geminiRecoveryTimer)return;
+  const delays=[15000,30000,60000,120000,180000,300000];
+  const schedule=()=>{
+   if(disposed)return;
+   const delay=delays[Math.min(geminiRecoveryAttempt,delays.length-1)];
+   geminiRecoveryTimer=setTimeout(async()=>{
+    geminiRecoveryTimer=null;if(disposed)return;
+    try{
+     await aiParse(text);geminiRecoveryAttempt=0;
+     status.textContent='Gemini رجع يشتغل تلقائيًا ✓';
+     setTimeout(()=>{if(status.textContent.includes('Gemini رجع'))status.textContent='';},4500);
+    }catch(error){
+     if(!transientGeminiError(error)){geminiRecoveryAttempt=0;return;}
+     geminiRecoveryAttempt+=1;schedule();
+    }
+   },delay);
+  };
+  schedule();
+ }
  async function runViaAI(text,ctx,userEl){
   status.textContent='بيفكر…';
   try{
-   const res=await aiParse(text);
+   const res=await aiParseWithRetry(text);
    const p=res?.plan;
    if(!p)throw new Error(res?.error||'رد غير متوقع.');
    status.textContent='';
@@ -146,7 +179,8 @@ export function mountAssistant({getContext,authorizeExport,exportResult,canPage,
    await runPlan(plan,ctx,`<p class="assistant-ai-badge">✦ Gemini${p.note?' — '+esc(p.note):''}</p>`);
   }catch(error){
    status.textContent='';
-   message(esc('تعذر الوصول للذكاء الاصطناعي (')+esc(error.message)+esc(')، هستخدم الفهم المحلي بدل كده:'));
+   message(esc('Gemini لسه غير متاح بعد المحاولات التلقائية (')+esc(error.message)+esc(')، هستخدم الفهم المحلي مؤقتًا. الرسالة الجاية هتحاول Gemini تلقائيًا من جديد:'));
+   if(transientGeminiError(error))startGeminiRecovery(text);
    runLocal(text,ctx,userEl);
   }
  }
@@ -237,5 +271,5 @@ export function mountAssistant({getContext,authorizeExport,exportResult,canPage,
  }
  mic.onclick=()=>{recognition||wantsListening?stopMic():startMic();};
 
- return()=>{disposed=true;stopMic(true);panel.remove();button.remove();};
+ return()=>{disposed=true;clearTimeout(geminiRecoveryTimer);geminiRecoveryTimer=null;stopMic(true);panel.remove();button.remove();};
 }
