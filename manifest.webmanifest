@@ -1,0 +1,13 @@
+{
+  "name": "Gorilla Field Intelligence",
+  "short_name": "Gorilla",
+  "description": "Gorilla Energy Drink field execution, outlet intelligence and visit analytics",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#071d2d",
+  "theme_color": "#071d2d",
+  "icons": [
+    {"src":"./gorilla-icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}
+  ]
+}
