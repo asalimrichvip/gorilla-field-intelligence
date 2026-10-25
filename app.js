@@ -385,9 +385,12 @@ async function checkFreshness(manual=false,scan=false){
  if(manual)toast(T('Checking Drive for new files…','جاري فحص الملفات الجديدة على Drive…'));
  if($('#refresh'))$('#refresh').disabled=true;
  try{const result=await api.call(manual||scan?'sync':'status');if(epoch!==sessionEpoch)return;
-  if(manual||result.sync?.revision!==data?.sync?.revision){if(!await refresh(false))return;}
-  if(result.sync?.errors?.length)toast(result.sync.errors.join(' · '));
-  else if(manual)toast(result.busy?T('File processing is already running. New data will appear automatically.','معالجة الملفات شغالة بالفعل. البيانات الجديدة هتظهر تلقائيًا.'):T('Latest available data loaded','تم تحميل أحدث بيانات متاحة'));
+  const syncing=Boolean(result.sync?.inProgress);
+  if(!syncing&&!result.busy&&(manual||result.sync?.revision!==data?.sync?.revision)){if(!await refresh(false))return;}
+  if(syncing)toast(result.sync?.phase==='preparing'?T('Files are synchronized. Preparing the data in the background…','الملفات اتزامنت، وجاري تجهيز البيانات في الخلفية…'):T('Drive sync is running in batches. Current data remains available…','التزامن شغال على دفعات. البيانات الحالية متاحة لحد ما يكتمل…'));
+  else if(result.sync?.errors?.length)toast(result.sync.errors.join(' · '));
+  else if(result.busy)toast(T('File processing is already running. New data will appear automatically.','معالجة الملفات شغالة بالفعل. البيانات الجديدة هتظهر تلقائيًا.'));
+  else if(manual)toast(T('Latest available data loaded','تم تحميل أحدث البيانات المتاحة'));
  }catch(e){if(e.code==='UNAUTHORIZED')endSession(T('Please sign in again','سجّل الدخول مرة أخرى'));else if(manual)toast(e.message);}
  finally{checking=false;if($('#refresh'))$('#refresh').disabled=false;}
 }

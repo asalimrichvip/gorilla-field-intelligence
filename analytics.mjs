@@ -30,6 +30,15 @@ export function skuDetails(r) {
   return {name,quantity:values.length?values.reduce((a,b)=>a+b,0):rawKeys.length&&!(consolidated>0)?null:consolidated!==null&&consolidated>=0?consolidated:null};
  });
 }
+function brandFacings(r,name) {
+ const direct=num(r[name]);
+ if(direct!==null&&direct>=0)return direct;
+ const escaped=name.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+ const suffix=new RegExp(`-\\s*${escaped}\\s+Facing Count(?:\\s+\\[\\d+\\])?$`,'i');
+ const keys=Object.keys(r).filter(k=>k.startsWith(name+' Facing Count')||suffix.test(k));
+ const values=keys.map(k=>num(r[k])).filter(v=>v!==null&&v>=0);
+ return values.length?values.reduce((a,b)=>a+b,0):null;
+}
 export function normalize(rows){return rows.map((r,i)=>{
  const id=r['Client Code']==null?'':String(r['Client Code']).trim();
  const lat=num(r.Lat),lng=num(r.Lng),seconds=parseDuration(r['Total Duration']),duration=num(r['Duration (min)'])??(seconds===null?null:seconds/60);
@@ -41,7 +50,12 @@ export function normalize(rows){return rows.map((r,i)=>{
  const presence=survey===true||productPresence===true?true:survey===false||productPresence===false?false:null;
  const status=String(r['حالة الزيارة']??'').trim();
  const success=status?Number(status==='زيارة ناجحة'):(num(r['Successful Visit'])??null);
- return {...r,_row:i+2,_id:id,_date:dateValue(r.Date),_duration:duration,_availability:known.length===SKU.length?present.length:presence===false?0:hasSkuColumns?null:num(r.Availability),_skus:skus,_skuCount:known.length===SKU.length?present.length:presence===false?0:null,_surveyGorilla:survey===null?'unknown':String(survey),_juhayna:triState(r[JUHAYNA_QUESTION])===null?'unknown':String(triState(r[JUHAYNA_QUESTION])),_presenceConflict:survey!==null&&productPresence!==null&&survey!==productPresence,_posm:rawPosm.length?sum([r],x=>POSM.reduce((a,k)=>a+(num(x[k])??0),0)):num(r['POSM Units']),_gorilla:num(r['Gorilla Total Facings']),_competitor:num(r['Competitor Facings']),_presence:presence,_success:success,_geo:lat!==null&&lng!==null&&Math.abs(lat)<=90&&Math.abs(lng)<=180&&(lat!==0||lng!==0)?[lat,lng]:null,_photos:photos};
+ const brandValues=Object.fromEntries(BRANDS.map(name=>[name,brandFacings(r,name)]));
+ const measuredGorilla=skus.map(s=>s.quantity).filter(v=>v!==null);
+ const explicitGorilla=num(r['Gorilla Total Facings']);
+ const explicitCompetitor=num(r['Competitor Facings']);
+ const measuredBrands=Object.values(brandValues).filter(v=>v!==null);
+ return {...r,...brandValues,_row:i+2,_id:id,_date:dateValue(r.Date),_duration:duration,_availability:known.length===SKU.length?present.length:presence===false?0:hasSkuColumns?null:num(r.Availability),_skus:skus,_skuCount:known.length===SKU.length?present.length:presence===false?0:null,_surveyGorilla:survey===null?'unknown':String(survey),_juhayna:triState(r[JUHAYNA_QUESTION])===null?'unknown':String(triState(r[JUHAYNA_QUESTION])),_presenceConflict:survey!==null&&productPresence!==null&&survey!==productPresence,_posm:rawPosm.length?sum([r],x=>POSM.reduce((a,k)=>a+(num(x[k])??0),0)):num(r['POSM Units']),_gorilla:explicitGorilla!==null?explicitGorilla:measuredGorilla.length?measuredGorilla.reduce((a,b)=>a+b,0):null,_competitor:explicitCompetitor!==null?explicitCompetitor:measuredBrands.length?measuredBrands.reduce((a,b)=>a+b,0):null,_presence:presence,_success:success,_geo:lat!==null&&lng!==null&&Math.abs(lat)<=90&&Math.abs(lng)<=180&&(lat!==0||lng!==0)?[lat,lng]:null,_photos:photos};
 });}
 export const visitStamp=r=>formatTimestamp(r['Started At']||r.Date||'');
 export function latest(rows){const map=new Map();for(const r of rows){if(!r._id)continue;const before=map.get(r._id);if(!before||visitStamp(r)>=visitStamp(before))map.set(r._id,r);}return [...map.values()];}
