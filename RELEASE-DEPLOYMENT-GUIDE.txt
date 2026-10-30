@@ -1,0 +1,24 @@
+﻿GORILLA FIELD INTELLIGENCE — RELEASE PACKAGE 2026-10-30
+
+CONTENTS
+- Frontend files for GitHub Pages (root files plus assets/ and vendor/).
+- Apps-Script-Backend/Code.gs: matching full Apps Script backend source including governance routes.
+- governance.test.mjs: local governance tests.
+
+FRONTEND DEPLOYMENT
+1. Extract the ZIP.
+2. Upload the frontend root files and the assets/ and vendor/ folders to the ROOT of the GitHub Pages repository. Do not upload this ZIP itself as the site root.
+3. Keep config.mjs pointed to the Apps Script web app URL used by this deployment.
+
+BACKEND DEPLOYMENT — REQUIRED FOR GOVERNANCE FEATURES
+1. Open the existing Gorilla Apps Script project attached to the production Drive data.
+2. Make a backup/version of the current script before replacing anything.
+3. Replace the project source with Apps-Script-Backend/Code.gs (single-file source; it includes the full backend implementation).
+4. Save, then deploy a NEW version of the existing Web App deployment, preserving the existing execution/access settings. If Google issues a different /exec URL, update config.mjs API_URL before publishing the frontend.
+5. Run the owner login, bootstrap, data refresh, POSM/governance actions and notifications smoke tests against the deployed web app.
+
+IMPORTANT VALIDATION STATUS
+- Local syntax checks passed for app.js, governance.mjs, api.mjs, assistant-engine.mjs and assistant-ui.mjs.
+- Governance unit tests: 16 passed, 0 failed.
+- Login is separated from bootstrap to avoid making authentication wait for the initial data bundle.
+- Live Apps Script authentication and real Drive-backed governance actions have not been executed from this build environment. Do not claim production smoke tests passed until they are run after deployment.
