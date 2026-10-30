@@ -1,7 +1,7 @@
 import {renderHero,bindHero,heroEditor,slideEditor,readHeroSlides,safeImage} from './hero.mjs?v=1530';
 import {supportingRows,supportedFilters,filterSupporting,notificationKeys,attachPasswordEyes,unlockAlertAudio,playAlert} from './experience.mjs?v=1530';
 import {API_URL} from './config.mjs?v=1546';
-import {createApi,loadSheets,prepareBundle} from './api.mjs?v=1545';
+import {createApi,loadSheets,prepareBundle} from './api.mjs?v=1547';
 import {xlsxBytes,csvBytes} from './export.mjs';
 const api=createApi(API_URL);
 import {SKU,BRANDS,POSM,num,sum,avg,unique,yes,normalize,latest,filterRows,group,kpis,health,presenceReport,visitStamp,cycleInfo,cyclePeriods} from './analytics.mjs?v=1530';

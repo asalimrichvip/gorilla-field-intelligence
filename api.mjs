@@ -7,7 +7,8 @@ export function createApi(url, storage=globalThis.sessionStorage, fetcher=global
     hasSession:()=>Boolean(token),
     setToken(value){token=value||'';if(token)storage?.setItem('gorilla-session',token);else storage?.removeItem('gorilla-session');},
     async call(action, payload={}){
-      const timeoutMs=action==='login'?45000:action==='bootstrap'?300000:90000;
+      // Keep sign-in responsive; never leave the login screen spinning for minutes.
+      const timeoutMs=action==='login'?30000:action==='bootstrap'?30000:90000;
       const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),timeoutMs);
       try{
         const res=await fetcher(url,{method:'POST',redirect:'follow',credentials:'omit',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({...payload,action,token}),signal:controller.signal});
@@ -15,7 +16,7 @@ export function createApi(url, storage=globalThis.sessionStorage, fetcher=global
         try{out=JSON.parse(text);}catch{throw new ApiError('Google returned a page instead of data. Check the Apps Script deployment URL and access settings.','INVALID_RESPONSE');}
         if(!res.ok||!out.ok)throw new ApiError(out.error||'Request failed',out.error==='Unauthorized'?'UNAUTHORIZED':out.code||'REQUEST_FAILED');
         return out;
-      }catch(e){if(e.name==='AbortError')throw new ApiError('The request timed out. Please retry.','TIMEOUT');throw e;}finally{clearTimeout(timer);}
+      }catch(e){if(e.name==='AbortError')throw new ApiError('Dashboard loading took too long. Your sign-in is saved; retry loading data.','TIMEOUT');throw e;}finally{clearTimeout(timer);}
     }
   };
 }

@@ -3144,7 +3144,13 @@ function webBootstrap(session,compact=true){
   if(waitingForPublish){
     prepared=loadLatestPreparedSheets_();
     if(!prepared)throw new Error('The first Gorilla data sync is still preparing the files. Please try again in a minute.');
-  }else prepared=sharedPreparedSheets(revision,index);
+  }else if(preparedAvailable(revision))prepared=sharedPreparedSheets(revision,index);
+  else {
+    // Never rebuild every workbook inside a user's login request. Queue the
+    // bounded background sync and return a retryable state immediately.
+    try{scheduleGorillaSyncContinuation_();}catch(scheduleError){Logger.log('Could not queue initial data preparation: '+String(scheduleError.message||scheduleError));}
+    throw new Error('Dashboard data is still being prepared. Your sign-in is active; retry loading data in a minute.');
+  }
   const sheets={};
   for(const name of ALLOWED_DATA_SHEETS){
     const sheet=prepared[name];if(!sheet.ok){sheets[name]=sheet;continue;}
