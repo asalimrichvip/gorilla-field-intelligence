@@ -207,3 +207,9 @@ body{background:radial-gradient(circle at 64% 0,color-mix(in srgb,var(--accent) 
 .login-shell.login-centered .login-center-wrap{position:relative!important;left:auto!important;top:auto!important;transform:none!important;grid-column:1!important;grid-row:1!important;align-self:center!important;display:flex!important;flex-direction:column!important;align-items:center!important;gap:10px!important;margin:0 auto!important}
 .login-shell.login-centered .login-copyright{position:relative!important;z-index:2;width:100%;max-width:100%;margin:0!important;padding:0 12px 2px;text-align:center!important;color:#a4bad0;font-size:12px;line-height:1.5}
 @media(max-width:620px){.login-shell.login-centered .login-copyright{font-size:11px;padding-bottom:2px}}
+
+/* Keep the legal line below the card as its own centered row at every viewport. */
+.login-shell.login-centered{display:flex!important;flex-direction:column!important;justify-content:center!important;align-items:center!important;gap:10px!important}
+.login-shell.login-centered .login-center-wrap{position:relative!important;inset:auto!important;transform:none!important;display:flex!important;flex-direction:column!important;align-items:center!important;width:min(460px,calc(100vw - 36px))!important;margin:0!important}
+.login-shell.login-centered .login-copyright{flex:none!important}
+@media(max-height:760px){.login-shell.login-centered{justify-content:flex-start!important;padding-top:24px!important;padding-bottom:24px!important}}

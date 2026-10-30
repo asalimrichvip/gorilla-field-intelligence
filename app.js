@@ -147,11 +147,11 @@ function loginScreen(message=''){
    button.disabled=true;button.classList.add('busy');status.textContent=T('Signing in…','جاري تسجيل الدخول…');
    try{
      if(location.protocol==='file:') throw new Error(T('Open the app through start.bat, not by double-clicking index.html.','شغّل البرنامج من start.bat، وليس بفتح index.html مباشرة.'));
-           const out=await api.call('login',{username,password,bootstrap:true,format:'columns'});
-      if(!out.user||!out.token)throw new Error('Invalid login response');
-      api.setToken(out.token);state.me=out.user;state.filters={};state.filtersByTab={dashboard:{}};state.photoClientCode='';state.tab='dashboard';
+     const out=await api.call('login',{username,password});
+     if(!out.user||!out.token)throw new Error('Invalid login response');
+     api.setToken(out.token);state.me=out.user;state.filters={};state.filtersByTab={dashboard:{}};state.photoClientCode='';state.tab='dashboard';
 status.textContent=T('Signed in · loading latest prepared data…','تم الدخول · جاري تحميل أحدث بيانات جاهزة…');
-await refresh(true,out.bootstrap);
+     await refresh(true);
    }catch(err){
      button.disabled=false;button.classList.remove('busy');status.textContent='';loginScreen(err.message||T('Login failed','فشل تسجيل الدخول'));
    }
