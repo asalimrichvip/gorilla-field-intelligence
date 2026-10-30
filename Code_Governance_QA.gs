@@ -8,6 +8,8 @@ const INDEX_CHUNK_PREFIX = 'GORILLA_CACHE_INDEX_CHUNK_V2_';
 const SYNC_MAX_FILES_PER_RUN = 2;
 const SYNC_BUDGET_MS = 210000;
 const SYNC_CONTINUATION_HANDLER = 'continueGorillaSync';
+const GOVERNANCE_RECONCILE_HANDLER = 'reconcileGorillaGovernance';
+const GOVERNANCE_RECONCILED_PROPERTY = 'GORILLA_GOVERNANCE_RECONCILED_REVISION';
 const PREP_BUILD_PROPERTY = 'GORILLA_PREP_BUILD_V3';
 const PREPARED_PARTS_PROPERTY = 'GORILLA_PREPARED_PARTS_V3';
 
@@ -3091,6 +3093,7 @@ function syncGorillaData(force){
 
     props.setProperty('GORILLA_SYNC_STATUS',JSON.stringify({checkedAt:new Date().toISOString(),revision:revision,targetRevision:revision,inProgress:false,phase:'complete',startedAt:startedAt,totalFiles:files.length,processed:baseProcessed+processedThisRun,retryingFailedFiles:false,errors:errors}));
     clearGorillaSyncContinuation_();
+    scheduleGorillaGovernanceReconciliation_(revision);
     Logger.log('Sync completed. Cached workbooks: '+Object.keys(index).length+'; errors: '+errors.length);
     return {ok:true,revision:revision,errors:errors};
   }finally{lock.releaseLock();}
@@ -3112,6 +3115,19 @@ function scheduleGorillaSyncContinuation_(){
 
 function clearGorillaSyncContinuation_(){
   ScriptApp.getProjectTriggers().filter(t=>t.getHandlerFunction()===SYNC_CONTINUATION_HANDLER).forEach(t=>ScriptApp.deleteTrigger(t));
+}
+function scheduleGorillaGovernanceReconciliation_(revision){
+  const props=PropertiesService.getScriptProperties(),key=preparedRevisionKey(revision);
+  if(props.getProperty(GOVERNANCE_RECONCILED_PROPERTY)===key)return;
+  if(ScriptApp.getProjectTriggers().some(t=>t.getHandlerFunction()===GOVERNANCE_RECONCILE_HANDLER))return;
+  ScriptApp.newTrigger(GOVERNANCE_RECONCILE_HANDLER).timeBased().after(60*1000).create();
+}
+function reconcileGorillaGovernance(){
+  const props=PropertiesService.getScriptProperties(),index=loadCacheIndex();
+  const revision=Object.values(index).map(x=>x.cacheFileId).sort().join('|'),key=preparedRevisionKey(revision);
+  if(props.getProperty(GOVERNANCE_RECONCILED_PROPERTY)===key)return;
+  reconcileStoreMonitoring_(sharedPreparedSheets(revision,index));
+  props.setProperty(GOVERNANCE_RECONCILED_PROPERTY,key);
 }
 // Shared schedule for all users; replace only this project's sync triggers.
 function installSyncTrigger(){
@@ -3140,7 +3156,8 @@ function webBootstrap(session,compact=true){
   const users=loadUsers(),out={ok:true,user:publicUser(users[session.username]),settings:readWebSettings(),sheets:sheets,sync:Object.assign({},status,{revision:waitingForPublish?(status.revision||''):revision})};
   if(session.role==='owner')out.users=Object.values(users).map(publicUser);
   try {
-    reconcileStoreMonitoring_(prepared);
+    // Keep dashboard startup read-only and fast. Full reconciliation scans
+    // every visit against the route plan and must not run in a login request.
     out.governance = getGovernanceForUser_(session);
   } catch (governanceError) {
     Logger.log('Governance snapshot warning: ' + String(governanceError.message || governanceError));
@@ -3234,8 +3251,8 @@ function getGovernanceBook_(){
   const first=book.getSheets()[0];if(first&&first.getName()==='Sheet1'&&!GOVERNANCE_HEADERS_['Sheet1']){try{book.deleteSheet(first);}catch(err){}}
   return book;
 }
-function governanceRows_(name){
-  const sheet=getGovernanceBook_().getSheetByName(name),values=sheet.getDataRange().getValues();
+function governanceRows_(name,book){
+  const sheet=(book||getGovernanceBook_()).getSheetByName(name),values=sheet.getDataRange().getValues();
   if(values.length<2)return [];
   const headers=values[0].map(x=>String(x||''));
   return values.slice(1).map((row,index)=>({__row:index+2,...Object.fromEntries(headers.map((h,i)=>[h,row[i]==null?'':row[i]]))})).filter(r=>Object.values(r).some(v=>v!==''));
@@ -3376,12 +3393,13 @@ function governanceAction_(action,body,session){
   return null;
 }
 function getGovernanceForUser_(session){
+  const book=getGovernanceBook_();
   const inScope=rtm=>session.role==='owner'||isRtmAllowed(rtm,session.rtms);
-  const alerts=governanceRows_('Alerts').filter(r=>inScope(r.RTM)).sort((a,b)=>String(b['Opened At']).localeCompare(String(a['Opened At'])));
-  const requests=governanceRows_('Requests').filter(r=>inScope(r.RTM)).sort((a,b)=>String(b['Requested At']).localeCompare(String(a['Requested At'])));
-  const storeStates=governanceRows_('Store State').filter(r=>inScope(r.RTM));
-  const notifications=governanceRows_('Notifications').filter(r=>r.Username===session.username).sort((a,b)=>String(b['Created At']).localeCompare(String(a['Created At'])));
-  const prefs=governanceRows_('Preferences').filter(r=>r.Username===session.username).reduce((o,r)=>(o[r.Key]=r.Value,o),{});
+  const alerts=governanceRows_('Alerts',book).filter(r=>inScope(r.RTM)).sort((a,b)=>String(b['Opened At']).localeCompare(String(a['Opened At'])));
+  const requests=governanceRows_('Requests',book).filter(r=>inScope(r.RTM)).sort((a,b)=>String(b['Requested At']).localeCompare(String(a['Requested At'])));
+  const storeStates=governanceRows_('Store State',book).filter(r=>inScope(r.RTM));
+  const notifications=governanceRows_('Notifications',book).filter(r=>r.Username===session.username).sort((a,b)=>String(b['Created At']).localeCompare(String(a['Created At'])));
+  const prefs=governanceRows_('Preferences',book).filter(r=>r.Username===session.username).reduce((o,r)=>(o[r.Key]=r.Value,o),{});
   return {alerts,requests,storeStates,notifications,preferences:prefs};
 }
 function governanceStamp_(row){return normalizeNewStoreStamp(row['Started At']||row.Date||row['Visit Date']||'',row.Date||'');}
