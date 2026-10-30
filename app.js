@@ -1,7 +1,7 @@
 import {renderHero,bindHero,heroEditor,slideEditor,readHeroSlides,safeImage} from './hero.mjs?v=1530';
 import {supportingRows,supportedFilters,filterSupporting,notificationKeys,attachPasswordEyes,unlockAlertAudio,playAlert} from './experience.mjs?v=1530';
 import {API_URL} from './config.mjs';
-import {createApi,loadSheets,prepareBundle} from './api.mjs?v=1530';
+import {createApi,loadSheets,prepareBundle} from './api.mjs?v=1545';
 import {xlsxBytes,csvBytes} from './export.mjs';
 const api=createApi(API_URL);
 import {SKU,BRANDS,POSM,num,sum,avg,unique,yes,normalize,latest,filterRows,group,kpis,health,presenceReport,visitStamp,cycleInfo,cyclePeriods} from './analytics.mjs?v=1530';
@@ -156,6 +156,11 @@ status.textContent=T('Signed in · loading latest prepared data…','تم الد
      button.disabled=false;button.classList.remove('busy');status.textContent='';loginScreen(err.message||T('Login failed','فشل تسجيل الدخول'));
    }
  });
+}
+
+function bootstrapRetryScreen(message){
+ $('#app').innerHTML=`<main class="login-shell login-centered"><div class="login-bg" aria-hidden="true"></div><div class="login-vignette" aria-hidden="true"></div><section class="login-center-wrap"><div class="login-center-card"><div class="login-center-brand login-logo-shine"><img src="./assets/gorilla-logo.png" alt="Gorilla Energy Drink"></div><div class="login-center-slogan">SESSION <span>ACTIVE</span></div><p class="login-center-sub">${T('Your sign-in is still active, but dashboard data did not finish loading. Retry without entering your password again.','تم تسجيل الدخول، لكن تحميل بيانات لوحة المعلومات لم يكتمل. أعد المحاولة دون إدخال كلمة المرور مرة أخرى.')}</p><div class="login-error" role="alert">${esc(message)}</div><button id="retry-bootstrap" class="accent login-submit" type="button">${T('RETRY LOADING DATA','إعادة تحميل البيانات')} <span>→</span></button><small class="login-foot">GORILLA FIELD INTELLIGENCE · SECURE ACCESS</small></div></section><footer class="login-copyright">© 2026 Ahmed Salim. All rights reserved.</footer></main>`;
+ $('#retry-bootstrap').onclick=()=>refresh(true);
 }
 
 function render(){
@@ -398,7 +403,7 @@ async function refresh(initial=false,preparedBundle=null){
   updateAlerts();state.busy=false;render();
   if(initial)void checkFreshness(false);
   return true;
- }catch(e){state.busy=false;if(e.code==='UNAUTHORIZED')return endSession(T('Your session ended. Please sign in again.','انتهت الجلسة. سجّل الدخول مرة أخرى.'));if(data){render();toast(T('Refresh failed. Previous data retained: ','فشل التحديث. البيانات السابقة محفوظة: ')+e.message)}else loginScreen(e.message)}
+ }catch(e){state.busy=false;if(e.code==='UNAUTHORIZED')return endSession(T('Your session ended. Please sign in again.','انتهت الجلسة. سجّل الدخول مرة أخرى.'));if(data){render();toast(T('Refresh failed. Previous data retained: ','فشل التحديث. البيانات السابقة محفوظة: ')+e.message)}else if(api.hasSession())bootstrapRetryScreen(e.message);else loginScreen(e.message)}
 }
 async function checkFreshness(manual=false,scan=false){
  if(checking||state.busy||!state.me)return;checking=true;const epoch=sessionEpoch;
