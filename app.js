@@ -396,7 +396,6 @@ async function refresh(initial=false,preparedBundle=null){
   localStorage.setItem('gorilla-known-columns',JSON.stringify(data.sheets.All.columns));
   state.columns=[...new Set(state.columns)].filter(c=>data.sheets.All.columns.includes(c));if(!state.columns.length)state.columns=data.sheets.All.columns.slice(0,10);
   updateAlerts();state.busy=false;render();
-  if(initial)void checkFreshness(false);
   return true;
  }catch(e){state.busy=false;if(e.code==='UNAUTHORIZED')return endSession(T('Your session ended. Please sign in again.','انتهت الجلسة. سجّل الدخول مرة أخرى.'));if(data){render();toast(T('Refresh failed. Previous data retained: ','فشل التحديث. البيانات السابقة محفوظة: ')+e.message)}else loginScreen(e.message)}
 }
@@ -407,7 +406,7 @@ async function checkFreshness(manual=false,scan=false){
  try{const result=await api.call(manual||scan?'sync':'status');if(epoch!==sessionEpoch)return;
   const syncing=Boolean(result.sync?.inProgress);
   if(!syncing&&!result.busy&&(manual||result.sync?.revision!==data?.sync?.revision)){if(!await refresh(false))return;}
-  if(syncing)toast(result.sync?.phase==='preparing'?T('Files are synchronized. Preparing the data in the background…','الملفات اتزامنت، وجاري تجهيز البيانات في الخلفية…'):T('Drive sync is running in batches. Current data remains available…','التزامن شغال على دفعات. البيانات الحالية متاحة لحد ما يكتمل…'));
+  if(syncing&&manual)toast(result.sync?.phase==='preparing'?T('Files are synchronized. Preparing the data in the background…','الملفات اتزامنت، وجاري تجهيز البيانات في الخلفية…'):T('Drive sync is running in batches. Current data remains available…','التزامن شغال على دفعات. البيانات الحالية متاحة لحد ما يكتمل…'));
   else if(result.sync?.errors?.length)toast(result.sync.errors.join(' · '));
   else if(result.busy)toast(T('File processing is already running. New data will appear automatically.','معالجة الملفات شغالة بالفعل. البيانات الجديدة هتظهر تلقائيًا.'));
   else if(manual)toast(T('Latest available data loaded','تم تحميل أحدث البيانات المتاحة'));
@@ -433,8 +432,7 @@ function updateAlerts(){
 }
 let lastSoundKeys=new Set();
 document.addEventListener('pointerdown',unlockAlertAudio,{once:true});
-setInterval(()=>{if(state.me)void checkFreshness(false);},60000);
-document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&state.me)void checkFreshness(false);});
+setInterval(()=>{if(state.me)void checkFreshness(false);},3600000);
 async function saveShared(settings){try{state.appSettings=(await api.call('saveSettings',{settings})).settings;toast(T('Settings saved','تم حفظ الإعدادات'));return true}catch(e){toast(e.message);return false}}
 async function saveAppearance(){
  const hero={enabled:$('#hero-enabled').checked,autoplaySeconds:Number($('#hero-speed').value||6),fit:$('#hero-fit').value,slides:readHeroSlides($('#hero-slide-editor'))};
