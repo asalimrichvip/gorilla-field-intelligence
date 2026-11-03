@@ -24,7 +24,7 @@ export function prepareSheet(result) {
   const columns=[...new Set([...(result.columns||[]),...result.rows.flatMap(Object.keys)])];
   const ignored=columns.filter(c=>c.includes('#REF!')||result.rows.some(r=>typeof r[c]==='string'&&r[c].includes('#REF!')));
   const keep=columns.filter(c=>!ignored.includes(c));
-  return {columns:keep,rows:result.rows.map(r=>Object.fromEntries(Object.entries(r).filter(([k])=>!ignored.includes(k)))),ignored,warnings:result.warnings||[]};
+  return {columns:keep,sourceColumns:result.sourceColumns||[],rows:result.rows.map(r=>Object.fromEntries(Object.entries(r).filter(([k])=>!ignored.includes(k)))),ignored,warnings:result.warnings||[]};
 }
 export async function loadSheets(api,previous){
   const sheets={},ignored={},warnings=[],schemaChanges=[];

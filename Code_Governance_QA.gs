@@ -1971,7 +1971,9 @@ function getLatestRoutePlanRows(context) {
           .map(key => String(original[key] || '').trim())
           .filter(Boolean)
           .join(' | ');
-        rows.push({
+        // Preserve every source column (especially the weekday route schedule)
+        // and add the canonical fields consumed by the dashboard alongside it.
+        rows.push(Object.assign({}, original, {
           'Client Code': String(code).trim(),
           'Client': firstNewStoreValue(original, ['Branch Name','Outlet Name Conc','Client','Name','Client Local Name']),
           'TDM': normalizeNewStoreTdm(firstNewStoreValue(original, ['New Repzo User','TDM','Rep'])),
@@ -1985,7 +1987,7 @@ function getLatestRoutePlanRows(context) {
           '_sourceDate': item.sourceDate,
           '_sourceModified': item.modified || item.cachedAt || '',
           '_sourceFileId': item._sourceId
-        });
+        }));
       });
 
       return {
@@ -1993,12 +1995,13 @@ function getLatestRoutePlanRows(context) {
         sourceFile: item.sourceFileName,
         sourceDate: item.sourceDate,
         sourceModified: item.modified || item.cachedAt || '',
-        sheetName: sheet.getName()
+        sheetName: sheet.getName(),
+        sourceColumns: headers
       };
     }
   }
 
-  return {rows: [], sourceFile: '', sourceDate: '', sourceModified: '', sheetName: ''};
+  return {rows: [], sourceFile: '', sourceDate: '', sourceModified: '', sheetName: '', sourceColumns: []};
 }
 
 
@@ -2020,6 +2023,7 @@ function getSecureRoutePlanData(session, context) {
     sourceDate: result.sourceDate || null,
     sourceModified: result.sourceModified || null,
     sourceSheet: result.sheetName || null,
+    sourceColumns: result.sourceColumns || [],
     columns: columns,
     warnings: result.rows.length ? [] : ['Route Plan: no matching route-plan sheet was found.'],
     rows: rows
@@ -3116,7 +3120,7 @@ function clearGorillaSyncContinuation_(){
 // Shared schedule for all users; replace only this project's sync triggers.
 function installSyncTrigger(){
   const triggers=ScriptApp.getProjectTriggers().filter(t=>t.getHandlerFunction()==='syncGorillaData');
-  ScriptApp.newTrigger('syncGorillaData').timeBased().everyMinutes(15).create();
+  ScriptApp.newTrigger('syncGorillaData').timeBased().everyHours(1).create();
   triggers.forEach(t=>ScriptApp.deleteTrigger(t));
 }
 function syncStatus(){return JSON.parse(PropertiesService.getScriptProperties().getProperty('GORILLA_SYNC_STATUS')||'{}');}
@@ -3134,7 +3138,7 @@ function webBootstrap(session,compact=true){
     const sheet=prepared[name];if(!sheet.ok){sheets[name]=sheet;continue;}
     const rtm=sheet.columns.indexOf('RTM');
     const values=sheet.values.filter(row=>isRtmAllowed(rtm<0?'':row[rtm],session.rtms));
-    sheets[name]={ok:true,columns:sheet.columns,values:values,count:values.length,warnings:sheet.warnings||[]};
+    sheets[name]={ok:true,columns:sheet.columns,sourceColumns:sheet.sourceColumns||[],values:values,count:values.length,warnings:sheet.warnings||[]};
     if(!compact){sheets[name].rows=values.map(row=>Object.fromEntries(sheet.columns.map((c,i)=>[c,row[i]])));delete sheets[name].values;}
   }
   const users=loadUsers(),out={ok:true,user:publicUser(users[session.username]),settings:readWebSettings(),sheets:sheets,sync:Object.assign({},status,{revision:waitingForPublish?(status.revision||''):revision})};
@@ -3173,7 +3177,7 @@ function sharedPreparedSheets(revision,index){
       const result=getSecureSheetData(name,{username:'internal',role:'owner',rtms:['*']},'','',context);
       if(!result.ok){sheets[name]=result;continue;}
       const columns=Array.from(new Set(result.columns.concat(['_sourceFile','_sourceDate','RTM'])));
-      sheets[name]={ok:true,columns:columns,values:result.rows.map(row=>columns.map(c=>row[c]==null?'':row[c])),warnings:result.warnings};
+      sheets[name]={ok:true,columns:columns,sourceColumns:result.sourceColumns||[],values:result.rows.map(row=>columns.map(c=>row[c]==null?'':row[c])),warnings:result.warnings};
     }catch(err){if(name==='All')throw err;sheets[name]={ok:false,error:String(err.message||err)};}
   }
   if(sheets.All&&sheets.All.ok)try{
@@ -3569,7 +3573,7 @@ function prepareGorillaSheetsBatch_(revision,index){
     }else{
       const columns=Array.from(new Set((result.columns||[]).concat(['_sourceFile','_sourceDate','RTM'])));
       const rows=Array.isArray(result.rows)?result.rows:[];
-      sheet={ok:true,columns:columns,values:rows.map(row=>columns.map(c=>row[c]==null?'':row[c])),count:rows.length,warnings:result.warnings||[]};
+      sheet={ok:true,columns:columns,sourceColumns:result.sourceColumns||[],values:rows.map(row=>columns.map(c=>row[c]==null?'':row[c])),count:rows.length,warnings:result.warnings||[]};
     }
     const root=DriveApp.getFolderById(ROOT_FOLDER_ID),folder=getOrCreateCacheFolder(root);
     const fileName='gorilla-prepared-v3-'+preparedRevision.replace(/[^a-zA-Z0-9_-]/g,'').slice(0,32)+'-'+name+'.json';
