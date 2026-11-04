@@ -2731,6 +2731,7 @@ function getRTMFromRep(
 // Add alongside Code.gs. Existing accounts and secrets stay in Script Properties.
 const WEB_PAGES = ['dashboard','presence','execution','market','insights','performance','newstores','geo','stores','photos','all','reports'];
 const WEB_SETTINGS = 'GORILLA_WEB_SETTINGS';
+const WEB_PROGRAMMING_COPY = 'GORILLA_PROGRAMMING_COPY';
 const ROUND_CONTROL_PROPERTY = 'GORILLA_ROUND_CONTROL';
 const USER_PHOTO_PREFIX = 'GORILLA_USER_PHOTO_';
 function userPhotoKey(username){return USER_PHOTO_PREFIX+Utilities.base64EncodeWebSafe(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,String(username||'').trim().toLowerCase()));}
@@ -2783,6 +2784,7 @@ function getRoundControl(){
 function readWebSettings(){
   const props=PropertiesService.getScriptProperties().getProperties();
   let settings={};try{settings=JSON.parse(props[WEB_SETTINGS]||'{}')}catch(err){settings={}}
+  try{settings.programmingCopy=JSON.parse(props[WEB_PROGRAMMING_COPY]||'[]')}catch(err){settings.programmingCopy=[]}
   settings.periodCatalog=cleanPeriodCatalog_(settings.periodCatalog||{});
   settings.roundControl=getRoundControl();
   if(settings.hero&&Array.isArray(settings.hero.slides))settings.hero.slides=settings.hero.slides.map(slide=>Object.assign({},slide,{page:slide.page==='availability'||slide.page==='presencetrends'?'presence':['health','optional'].includes(slide.page)?'reports':slide.page}));
@@ -2821,6 +2823,17 @@ function cleanPeriodCatalog_(input){
     });
     return p;
   })};
+}
+function cleanProgrammingCopy_(input){
+  if(!Array.isArray(input))throw new Error('Programming copy must be a list');
+  if(input.length>60)throw new Error('Save no more than 60 wording entries');
+  const seen=new Set();
+  return input.map(item=>{
+    const key=String(item&&item.key||'').trim().slice(0,180);
+    if(!key)throw new Error('Every wording entry needs source text');
+    if(seen.has(key))throw new Error('Duplicate wording source: '+key);seen.add(key);
+    return {key:key,sourceAr:String(item.sourceAr||'').trim().slice(0,180),en:String(item.en||key).trim().slice(0,180),ar:String(item.ar||item.sourceAr||key).trim().slice(0,180),helpEn:String(item.helpEn||'').trim().slice(0,320),helpAr:String(item.helpAr||'').trim().slice(0,320)};
+  });
 }
 function readBody(e){try{return JSON.parse(e.postData.contents)}catch(err){return e.parameter||{};}}
 function requireOwner(session){if(session.role!=='owner')throw new Error('Owner only');}
@@ -2983,7 +2996,7 @@ function webAction(action,body,session){
   if(action==='saveSettings'){
     requireOwner(session);
     return withWebLock(function(){
-      const patch=body.settings||{},current=readWebSettings();delete current.tdmPhotos;delete current.roundControl;
+      const patch=body.settings||{},current=readWebSettings();let programmingCopyEncoded=null;delete current.tdmPhotos;delete current.roundControl;delete current.programmingCopy;
       if(patch.theme){if(!['ultimate','mango','watermelon'].includes(patch.theme))throw new Error('Invalid theme');current.theme=patch.theme;}
       if(patch.hero){
         current.hero={enabled:patch.hero.enabled!==false,title:String(patch.hero.title||'').slice(0,200),subtitle:String(patch.hero.subtitle||'').slice(0,500),autoplaySeconds:Math.max(3,Math.min(20,Number(patch.hero.autoplaySeconds)||6)),fit:patch.hero.fit==='contain'?'contain':'cover'};
@@ -2998,10 +3011,16 @@ function webAction(action,body,session){
       }
       if(patch.filters){current.filters={};WEB_PAGES.forEach(k=>{current.filters[k]=(Array.isArray(patch.filters[k])?patch.filters[k]:[]).filter(x=>['cycle','week','search','date','rtm','tdm','governorate','area','outlet','gorilla','juhayna','status'].includes(x));});}
       if(Object.prototype.hasOwnProperty.call(patch,'periodCatalog'))current.periodCatalog=cleanPeriodCatalog_(patch.periodCatalog);
+      if(Object.prototype.hasOwnProperty.call(patch,'programmingCopy')){
+        const copy=cleanProgrammingCopy_(patch.programmingCopy),encoded=JSON.stringify(copy);
+        if(Utilities.newBlob(encoded).getBytes().length>7000)throw new Error('Programming wording and hints are too large');
+        programmingCopyEncoded=encoded;
+      }
       if(patch.tabs){current.tabs={};WEB_PAGES.filter(k=>k!=='dashboard').forEach(k=>current.tabs[k]=patch.tabs[k]!==false);}
       if(patch.analysis){current.analysis={};['short','share','availability','perfectAvailability','perfectShare'].forEach(k=>{const n=Number(patch.analysis[k]);if(!isFinite(n)||n<0||n>(k==='short'?480:100))throw new Error('Invalid threshold');current.analysis[k]=n;});}
       if(Utilities.newBlob(JSON.stringify(current)).getBytes().length>8500)throw new Error('Settings are too large. Shorten image URLs or slide text.');
       PropertiesService.getScriptProperties().setProperty(WEB_SETTINGS,JSON.stringify(current));
+      if(programmingCopyEncoded!==null)PropertiesService.getScriptProperties().setProperty(WEB_PROGRAMMING_COPY,programmingCopyEncoded);
       return {ok:true,settings:readWebSettings()};
     });
   }
