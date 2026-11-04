@@ -10,6 +10,7 @@ const SYNC_BUDGET_MS = 210000;
 const SYNC_CONTINUATION_HANDLER = 'continueGorillaSync';
 const PREP_BUILD_PROPERTY = 'GORILLA_PREP_BUILD_V3';
 const PREPARED_PARTS_PROPERTY = 'GORILLA_PREPARED_PARTS_V3';
+const ROUTE_PLAN_ONLY_CACHE_PROPERTY_ = 'GORILLA_ROUTE_PLAN_ONLY_CACHE_V1';
 
 
 // =====================================================
@@ -1912,7 +1913,8 @@ function isRouteScheduleHeaders(normalizedHeaders) {
 
 
 function getLatestRoutePlanRows(context) {
-  const index = context && context.index ? context.index : loadCacheIndex();
+  const routeOnlyIndex = context && context.routeOnlyOverride ? null : routePlanCacheOnlyIndex_();
+  const index = routeOnlyIndex || (context && context.index ? context.index : loadCacheIndex());
   const sourceItems = Object.keys(index)
     .map(id => Object.assign({_sourceId:id}, index[id]))
     .sort((a, b) => String(b.modified || b.cachedAt || '').localeCompare(String(a.modified || a.cachedAt || '')));
@@ -2781,11 +2783,44 @@ function getRoundControl(){
 function readWebSettings(){
   const props=PropertiesService.getScriptProperties().getProperties();
   let settings={};try{settings=JSON.parse(props[WEB_SETTINGS]||'{}')}catch(err){settings={}}
+  settings.periodCatalog=cleanPeriodCatalog_(settings.periodCatalog||{});
   settings.roundControl=getRoundControl();
   if(settings.hero&&Array.isArray(settings.hero.slides))settings.hero.slides=settings.hero.slides.map(slide=>Object.assign({},slide,{page:slide.page==='availability'||slide.page==='presencetrends'?'presence':['health','optional'].includes(slide.page)?'reports':slide.page}));
   settings.tdmPhotos={};
   Object.keys(props).filter(k=>k.indexOf('GORILLA_TDM_PHOTO_')===0).forEach(k=>{try{const photo=JSON.parse(props[k]);settings.tdmPhotos[photo.rep]=photo.image;}catch(err){}});
   return settings;
+}
+function cleanPeriodCatalog_(input){
+  const source=input&&typeof input==='object'?input:{},periods=Array.isArray(source.periods)?source.periods:[];
+  if(periods.length>30)throw new Error('Add no more than 30 periods');
+  const validDate=value=>{
+    const stamp=String(value||'');if(!/^\d{4}-\d{2}-\d{2}$/.test(stamp))return false;
+    const parts=stamp.split('-').map(Number),date=new Date(Date.UTC(parts[0],parts[1]-1,parts[2]));
+    return date.toISOString().slice(0,10)===stamp;
+  };
+  const cleanRange=(item,label)=>{
+    const name=String(item.name||'').trim().slice(0,80),start=String(item.start||'').trim(),end=String(item.end||'').trim();
+    if(!name)throw new Error(label+' name is required');
+    if(!validDate(start)||!validDate(end)||end<start)throw new Error(label+' needs valid start and end dates');
+    return {name:name,start:start,end:end,enabled:item.enabled!==false};
+  };
+  let cycleCount=0,weekCount=0;
+  return {periods:periods.map(period=>{
+    const p=cleanRange(period,'Period'),cycles=Array.isArray(period.cycles)?period.cycles:[];
+    cycleCount+=cycles.length;if(cycleCount>180)throw new Error('Add no more than 180 cycles');
+    p.cycles=cycles.map(cycle=>{
+      const c=cleanRange(cycle,'Cycle'),weeks=Array.isArray(cycle.weeks)?cycle.weeks:[];
+      if(c.start<p.start||c.end>p.end)throw new Error('Cycle dates must stay inside their period');
+      weekCount+=weeks.length;if(weekCount>500)throw new Error('Add no more than 500 weeks');
+      c.weeks=weeks.map(week=>{
+        const w=cleanRange(week,'Week');
+        if(w.start<c.start||w.end>c.end)throw new Error('Week dates must stay inside their cycle');
+        return w;
+      });
+      return c;
+    });
+    return p;
+  })};
 }
 function readBody(e){try{return JSON.parse(e.postData.contents)}catch(err){return e.parameter||{};}}
 function requireOwner(session){if(session.role!=='owner')throw new Error('Owner only');}
@@ -2962,6 +2997,7 @@ function webAction(action,body,session){
         }
       }
       if(patch.filters){current.filters={};WEB_PAGES.forEach(k=>{current.filters[k]=(Array.isArray(patch.filters[k])?patch.filters[k]:[]).filter(x=>['cycle','week','search','date','rtm','tdm','governorate','area','outlet','gorilla','juhayna','status'].includes(x));});}
+      if(Object.prototype.hasOwnProperty.call(patch,'periodCatalog'))current.periodCatalog=cleanPeriodCatalog_(patch.periodCatalog);
       if(patch.tabs){current.tabs={};WEB_PAGES.filter(k=>k!=='dashboard').forEach(k=>current.tabs[k]=patch.tabs[k]!==false);}
       if(patch.analysis){current.analysis={};['short','share','availability','perfectAvailability','perfectShare'].forEach(k=>{const n=Number(patch.analysis[k]);if(!isFinite(n)||n<0||n>(k==='short'?480:100))throw new Error('Invalid threshold');current.analysis[k]=n;});}
       if(Utilities.newBlob(JSON.stringify(current)).getBytes().length>8500)throw new Error('Settings are too large. Shorten image URLs or slide text.');
@@ -3141,10 +3177,21 @@ function webBootstrap(session,compact=true){
     sheets[name]={ok:true,columns:sheet.columns,sourceColumns:sheet.sourceColumns||[],values:values,count:values.length,warnings:sheet.warnings||[]};
     if(!compact){sheets[name].rows=values.map(row=>Object.fromEntries(sheet.columns.map((c,i)=>[c,row[i]])));delete sheets[name].values;}
   }
+  const routeOnlyIndex=routePlanCacheOnlyIndex_();
+  if(routeOnlyIndex){
+    const route=getSecureRoutePlanData(session,{books:{},maps:{},index:routeOnlyIndex,routeOnlyOverride:true});
+    const columns=route.columns||[];
+    const values=(route.rows||[]).map(row=>columns.map(c=>row[c]==null?'':row[c]));
+    sheets.RoutePlan={ok:true,columns:columns,sourceColumns:route.sourceColumns||[],values:values,count:values.length,warnings:route.warnings||[]};
+    if(!compact)sheets.RoutePlan.rows=(route.rows||[]);
+    prepared.RoutePlan=sheets.RoutePlan;
+  }
   const users=loadUsers(),out={ok:true,user:publicUser(users[session.username]),settings:readWebSettings(),sheets:sheets,sync:Object.assign({},status,{revision:waitingForPublish?(status.revision||''):revision})};
   if(session.role==='owner')out.users=Object.values(users).map(publicUser);
   try {
-    reconcileStoreMonitoring_(prepared);
+    // Keep login/bootstrap responsive. Store monitoring reconciliation scans
+    // every route and visit and performs spreadsheet writes, so it must not
+    // run synchronously for every user session.
     out.governance = getGovernanceForUser_(session);
   } catch (governanceError) {
     Logger.log('Governance snapshot warning: ' + String(governanceError.message || governanceError));
@@ -3267,8 +3314,56 @@ function getRoutePlanApprovalMap_(){
   try{return JSON.parse(PropertiesService.getScriptProperties().getProperty(ROUTE_APPROVALS_PROPERTY_)||'{}')||{};}catch(err){return {};}
 }
 function saveRoutePlanApprovalMap_(map){PropertiesService.getScriptProperties().setProperty(ROUTE_APPROVALS_PROPERTY_,JSON.stringify(map));}
+function routePlanCacheOnlyIndex_(){
+  let meta=null;
+  try{meta=JSON.parse(PropertiesService.getScriptProperties().getProperty(ROUTE_PLAN_ONLY_CACHE_PROPERTY_)||'null');}catch(err){}
+  if(!meta||!meta.sourceId||!meta.cacheFileId)return null;
+  try{if(DriveApp.getFileById(meta.cacheFileId).isTrashed())return null;}catch(err){return null;}
+  return {[meta.sourceId]:{
+    sourceFileName:meta.sourceFileName||'',sourceDate:meta.sourceDate||'',modified:meta.modified||'',size:Number(meta.size||0),
+    cacheFileId:meta.cacheFileId,sheets:meta.sheets||[],cachedAt:meta.cachedAt||''
+  }};
+}
+// Refresh only the newest Drive workbook whose sheet has the full weekday RoutePlan schema.
+// The source workbook is read only; only its converted cache copy and this script's pointer change.
+function syncRoutePlanCacheOnly(){
+  const lock=LockService.getScriptLock();
+  if(!lock.tryLock(1000))return {ok:false,busy:true};
+  try{
+    const root=DriveApp.getFolderById(ROOT_FOLDER_ID),folder=getOrCreateCacheFolder(root),files=[];
+    collectExcelFiles(root,files,folder.getId());
+    const candidates=files.filter(file=>/rout(e|s)|route[ _-]?plan/i.test(file.getName()))
+      .sort((a,b)=>b.getLastUpdated().getTime()-a.getLastUpdated().getTime());
+    if(!candidates.length)return {ok:false,error:'No Route/Routs workbook was found in the configured Drive source folder.'};
+    const previous=JSON.parse(PropertiesService.getScriptProperties().getProperty(ROUTE_PLAN_ONLY_CACHE_PROPERTY_)||'null');
+    for(const file of candidates){
+      let converted=null;
+      try{
+        if(file.getMimeType()===MimeType.GOOGLE_SHEETS){const copy=file.makeCopy('CACHE - '+file.getName(),folder);converted={id:copy.getId(),name:copy.getName()};}
+        else converted=convertExcelToCache(file,folder);
+        if(!converted||!converted.id)throw new Error('Drive did not return a converted cache file.');
+        const book=SpreadsheetApp.openById(converted.id);
+        let match=null;
+        for(const sheet of book.getSheets()){
+          if(sheet.getLastRow()<2||sheet.getLastColumn()<2)continue;
+          const headers=makeUniqueApiHeaders(sheet.getRange(1,1,1,sheet.getLastColumn()).getValues()[0]);
+          if(isRouteScheduleHeaders(headers.map(normalizeApiText))){match={sheetName:sheet.getName(),rowCount:sheet.getLastRow()-1};break;}
+        }
+        if(!match){try{DriveApp.getFileById(converted.id).setTrashed(true)}catch(cleanupErr){};continue;}
+        const meta={sourceId:file.getId(),cacheFileId:converted.id,sourceFileName:file.getName(),sourceDate:detectSourceDate(file,book),modified:file.getLastUpdated().toISOString(),size:file.getSize(),sheets:Object.keys(inspectCachedWorkbook(book)),sheetName:match.sheetName,rowCount:match.rowCount,cachedAt:new Date().toISOString()};
+        PropertiesService.getScriptProperties().setProperty(ROUTE_PLAN_ONLY_CACHE_PROPERTY_,JSON.stringify(meta));
+        if(previous&&previous.cacheFileId&&previous.cacheFileId!==converted.id)try{DriveApp.getFileById(previous.cacheFileId).setTrashed(true)}catch(cleanupErr){}
+        return {ok:true,sourceFile:meta.sourceFileName,sourceSheet:meta.sheetName,rowCount:meta.rowCount,sourceModified:meta.modified,cacheOnly:true};
+      }catch(err){
+        if(converted&&converted.id)try{DriveApp.getFileById(converted.id).setTrashed(true)}catch(cleanupErr){}
+        if(candidates.length===1)return {ok:false,error:file.getName()+': '+String(err.message||err)};
+      }
+    }
+    return {ok:false,error:'Route/Routs workbooks were found, but none had the required Adhoc Serial, RTM, New Repzo User, and seven weekday schedule columns.'};
+  }finally{lock.releaseLock();}
+}
 function routePlanVersionList_(){
-  const index=loadCacheIndex(),items=Object.keys(index).map(id=>Object.assign({_sourceId:id},index[id])).sort((a,b)=>String(b.modified||b.cachedAt||'').localeCompare(String(a.modified||a.cachedAt||'')));
+  const index=Object.assign({},loadCacheIndex(),routePlanCacheOnlyIndex_()||{}),items=Object.keys(index).map(id=>Object.assign({_sourceId:id},index[id])).sort((a,b)=>String(b.modified||b.cachedAt||'').localeCompare(String(a.modified||a.cachedAt||'')));
   const out=[];
   items.forEach(item=>{
     let book;try{book=SpreadsheetApp.openById(item.cacheFileId);}catch(err){return;}
